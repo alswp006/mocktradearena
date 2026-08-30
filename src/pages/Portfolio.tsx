@@ -7,6 +7,7 @@ import { SummaryHero } from '../components/SummaryHero';
 import { Amount } from '../components/Amount';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/StateView';
+import { TradeHistoryTab } from '../components/TradeHistoryTab';
 import { AdSection } from '../components/AdSection';
 import { DisclaimerNotice } from '../components/DisclaimerNotice';
 import { FloatingTabBar } from '../components/FloatingTabBar';
@@ -38,7 +39,7 @@ function haptic() {
 export default function Portfolio() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { account, positions } = useAppState();
+  const { account, positions, trades } = useAppState();
   const [tabIndex, setTabIndex] = useState(0);
   const today = todayKst();
 
@@ -154,7 +155,7 @@ export default function Portfolio() {
           </div>
         ))}
 
-      {tabIndex === 1 && <div data-testid="portfolio-history-slot" />}
+      {tabIndex === 1 && <TradeHistoryTab trades={trades} onGoMarket={goMarket} />}
 
       <AdSection />
 

@@ -82,6 +82,12 @@ export function getKSTDate(): string {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}+09:00`;
 }
 
+// Date를 KST 기준 "YYYY-MM-DD HH:mm"으로 포맷 (거래내역 등 시각 표시용)
+export function formatKstDateTime(date: Date): string {
+  const { year, month, day, hour, minute } = getKSTParts(date);
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
 // KST 날짜/시각 문자열("YYYY-MM-DD" 또는 ISO 8601)을 Date로 파싱
 export function parseKSTDate(dateStr: string): Date {
   const normalized = dateStr.includes("T") ? dateStr : `${dateStr}T00:00:00`;
