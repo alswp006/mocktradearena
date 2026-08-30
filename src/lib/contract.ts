@@ -5,74 +5,74 @@
  * 타입을 그대로 가정해도 된다. 추측이 어긋나 병합에서 무너지는 것을 막기 위한 파일이다.
  */
 
-/** 종목 마스터 타입, 모든 거래·백테스트에서 사용 (구현: 패킷 0001) */
-export type Instrument = { id: string; name: string; category: "stock"|"etf"|"fund"; basePriceCents: number };
+/** 전역 사용자 엔티티 (구현: 패킷 0001) */
+export type User = { id: string; name: string; knowledgePoints: number; streak: number; lastCheckinDate: string };
 
-/** 보유 종목 항목, Portfolio 구성 (구현: 패킷 0001) */
-export type Position = { instrumentId: string; quantity: number; avgBuyPrice: number; currentPrice: number; unrealizedGainKrw: number };
+/** 종목 엔티티 (구현: 패킷 0001) */
+export type Instrument = { code: string; name: string; sector: string; price: number };
 
-/** 포트폴리오 전체, AppState의 핵심 (구현: 패킷 0001) */
-export type Portfolio = { totalAssetKrw: number; totalGainKrw: number; positions: Position[]; lastUpdatedAt: string };
+/** 포트폴리오 엔티티 (구현: 패킷 0001) */
+export type Portfolio = { userId: string; holdings: { code: string; quantity: number; buyPrice: number }[]; cashKrw: number };
 
-/** 체결 거래 기록, 거래내역·백테스트에서 사용 (구현: 패킷 0001) */
-export type Trade = { id: string; instrumentId: string; type: "buy"|"sell"; quantity: number; pricePerUnit: number; executedAt: string; totalKrw: number };
+/** 거래 기록 엔티티 (구현: 패킷 0001) */
+export type Trade = { id: string; userId: string; code: string; side: 'BUY' | 'SELL'; quantity: number; price: number; executedAt: string };
 
-/** 앱 전역 상태 스키마, 0006 Provider가 관리 (구현: 패킷 0001) */
-export type AppState = { userId: string; portfolio: Portfolio; wallet: { balanceKrw: number }; lastCheckinDate: string; streakDays: number };
+/** 라우팅 상태 (구현: 패킷 0001) */
+export type RouteState = { pathname: string; params?: Record<string, string>; state?: Record<string, unknown> };
 
-/** 라우팅 상태, 0019가 관리 (구현: 패킷 0001) */
-export type RouteState = { currentScreen: "home"|"market"|"trade"|"portfolio"|"backtest"|"quiz"|"quizResult"|"leaderboard"; tradePreview?: { instrumentId: string; quantity: number; type: "buy"|"sell" } };
+/** 백테스트 결과 엔티티 (구현: 패킷 0001) */
+export type BacktestResult = { cagr: number; mdd: number; sharpe: number; annualReturns: Record<string, number>; yearlyVolatility: number };
 
-/** 퀴즈 제출 결과, 0008·0017에서 사용 (구현: 패킷 0001) */
-export type QuizResult = { userId: string; answersJson: string; score: number; profile: "conservative"|"moderate"|"aggressive"; submittedAt: string };
+/** 퀴즈 결과 엔티티 (구현: 패킷 0001) */
+export type QuizResult = { score: number; level: 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE'; nextQuizDate: string };
 
-/** 랭킹 항목, 0018에서 표시 (구현: 패킷 0001) */
-export type LeaderboardEntry = { rank: number; userId: string; score: number; questionsCorrect: number };
+/** 20개 종목 마스터 상수 (구현: 패킷 0002) */
+export type INSTRUMENTSFn = () => Instrument[];
 
-/** 종목의 지정 날짜 가격 조회, 0005·0011에서 호출 (구현: 패킷 0003) */
-export type getPriceForInstrumentFn = (instrumentId: string, dateStr: string) => number;
+/** KST 현재 날짜 (ISO 문자열) (구현: 패킷 0002) */
+export type getKSTDateFn = (date?: Date) => string;
 
-/** 현재 KST 시각 ISO 문자열, 모든 시간 처리 (구현: 패킷 0002) */
-export type getKSTDateFn = () => string;
+/** KST 날짜 더하기 (구현: 패킷 0002) */
+export type addDaysKSTFn = (date: string, days: number) => string;
 
-/** KST 문자열을 Date로 파싱 (구현: 패킷 0002) */
-export type parseKSTDateFn = (dateStr: string) => Date;
+/** 결정적 가격 생성 (hash32 기반) (구현: 패킷 0003) */
+export type generateDeterministicPriceFn = (code: string, date: string, basePrice: number, volatility: number) => number;
 
-/** KST 날짜에 days 더한 ISO 문자열 반환 (구현: 패킷 0002) */
-export type addDaysKSTFn = (dateStr: string, days: number) => string;
+/** localStorage 안전 읽기 (복구 포함) (구현: 패킷 0004) */
+export type storageGetFn = <T = unknown>(key: string) => T | null;
 
-/** localStorage 안전 조회 (파싱 복구, Quota 처리) (구현: 패킷 0004) */
-export type getStorageItemFn = <T>(key: string, defaultValue: T) => T;
+/** localStorage 안전 쓰기 (Quota 처리) (구현: 패킷 0004) */
+export type storageSetFn = (key: string, value: unknown) => boolean;
 
-/** localStorage 안전 저장 (QuotaExceededError 처리) (구현: 패킷 0004) */
-export type setStorageItemFn = (key: string, value: any) => boolean;
+/** localStorage 제거 (구현: 패킷 0004) */
+export type storageRemoveFn = (key: string) => void;
 
-/** 일일 체크인 실행, 스트릭·보상 계산 (구현: 패킷 0005) */
-export type executeCheckinFn = (userId: string, currentPortfolio: Portfolio) => { streakDays: number; dailyRewardKrw: number; isFirstCheckingToday: boolean };
+/** 거래 체결 엔진 (구현: 패킷 0005) */
+export type executeTradeForPortfolioFn = (portfolio: Portfolio, trade: Omit<Trade, 'id' | 'executedAt'>) => { success: boolean; updatedPortfolio?: Portfolio; error?: string };
 
-/** 거래 체결, Portfolio·Trade 생성 (구현: 패킷 0005) */
-export type executeTradeFn = (userId: string, walletBalance: number, trade: { instrumentId: string; quantity: number; type: "buy"|"sell"; pricePerUnit: number }) => { success: boolean; newWalletBalance: number; trade?: Trade; error?: string };
+/** 일일 지급 적용 (구현: 패킷 0005) */
+export type applyDailyStipendFn = (user: User, today: string) => { user: User; stipendKrw: number };
 
-/** 시계열 수익률로부터 백테스트 지표 계산 (구현: 패킷 0007) */
-export type calculateBacktestMetricsFn = (returns: number[]) => { cagr: number; maxDrawdown: number; sharpeRatio: number; winRate: number };
+/** 체크인 스트릭 갱신 (구현: 패킷 0005) */
+export type updateStreakFn = (user: User, today: string) => User;
 
-/** 퀴즈 답변 채점 및 투자성향 분류 (구현: 패킷 0008) */
-export type gradeQuizFn = (answersJson: string) => { score: number; profile: "conservative"|"moderate"|"aggressive"; questionsCorrect: number };
+/** 전역 상태 훅 (AppStateContext) (구현: 패킷 0006) */
+export type useAppStateFn = () => { user: User; portfolio: Portfolio; setUser: (u: User) => void; setPortfolio: (p: Portfolio) => void; trades: Trade[] };
 
-/** 리더보드 초기 시드 데이터 생성 (구현: 패킷 0008) */
-export type generateLeaderboardSeedsFn = () => LeaderboardEntry[];
+/** 백테스트 종합 지표 계산 (구현: 패킷 0007) */
+export type calculateBacktestMetricsFn = (dailyReturns: number[], yearlyBreakdown: Record<string, number[]>) => BacktestResult;
 
-/** KRW 통화 포맷 (예: '1,234,567원') (구현: 패킷 0001) */
-export type formatCurrencyFn = (krw: number) => string;
+/** 연복합성장률 (구현: 패킷 0007) */
+export type calculateCAGRFn = (startValue: number, endValue: number, years: number) => number;
 
-/** 백분율 포맷 (예: 0.1234 → '12.34%') (구현: 패킷 0001) */
-export type formatPercentFn = (decimal: number, decimals?: number) => string;
+/** 최대 낙폭 (구현: 패킷 0007) */
+export type calculateMDDFn = (prices: number[]) => number;
 
-/** ISO 날짜를 로케일 형식으로 (예: '2026-08-31') (구현: 패킷 0001) */
-export type formatDateFn = (dateStr: string) => string;
+/** 샤프 비율 (구현: 패킷 0007) */
+export type calculateSharpeRatioFn = (dailyReturns: number[], riskFreeRate?: number) => number;
 
-/** 글로벌 상태 훅, 모든 페이지에서 호출 (구현: 패킷 0006) */
-export type useAppStateFn = () => { state: AppState; updatePortfolio: (p: Portfolio) => void; updateWallet: (b: number) => void; updateStreak: (days: number) => void; executeCheckin: () => Promise<void> };
+/** 퀴즈 채점 규칙 (구현: 패킷 0008) */
+export type scoreQuizFn = (answers: number[], quizVersion: string) => { score: number; level: string };
 
-/** 라우팅 상태 훅, 네비게이션 제어 (구현: 패킷 0019) */
-export type useRouteFn = () => { current: RouteState; navigate: (screen: string, preview?: any) => void };
+/** 리더보드 시드 생성 (구현: 패킷 0008) */
+export type generateLeaderboardSeedFn = (users: User[], backtest: Record<string, BacktestResult>) => { rank: number; user: User; score: number }[];
