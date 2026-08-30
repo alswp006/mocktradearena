@@ -150,7 +150,8 @@ describe("Packet 0002: 종목 마스터 20종목 + KST 날짜 유틸", () => {
 
     // 2020 is leap year
     const lastDayOf2020 = toDayIndex("2020-12-31");
-    expect(lastDayOf2020).toBe(toDayIndex("2016-01-01") + 365 + 366 + 365 + 365 + 366); // 2016 leap + 3 years + 2020 leap
+    // 0-indexed: 2016-01-01 is day 0, so 5 full-year lengths overshoot by 1 (lands on 2021-01-01)
+    expect(lastDayOf2020).toBe(toDayIndex("2016-01-01") + 365 + 366 + 365 + 365 + 366 - 1); // 2016 leap + 3 years + 2020 leap
   });
 
   // ============= AC-5: endOfMonth() =============
