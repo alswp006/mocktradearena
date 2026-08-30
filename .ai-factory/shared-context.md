@@ -295,6 +295,10 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0011: 주문 화면 (S3) — 매수/매도·미리보기·체결 (files: src/pages/Trade.tsx)
 - 0012: 포트폴리오 (S4) — 보유종목 탭 (files: src/pages/Portfolio.tsx)
 - 0013: 포트폴리오 거래내역 탭 + 대량 리스트 처리 (files: src/components/TradeHistoryTab.tsx, src/pages/Portfolio.tsx)
+- 0014: 백테스트 구성 화면 (S5) — 종목/비중·실행·프리셋 (files: src/pages/Backtest.tsx)
+
+## TDD 상태
+⚠️ TDD 테스트 파일 자동 작성에 실패했습니다. 소스 코드를 작성하기 전에 `src/__tests__/packet-XXXX.test.ts` 파일에 AC 기반 테스트를 먼저 작성하세요 (TDD red phase). 테스트 작성 후 구현하세요.
 
 ## Available exports from existing files
 // src/App.tsx
