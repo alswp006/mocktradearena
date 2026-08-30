@@ -242,7 +242,7 @@ export interface AppMeta {
 - contract.ts: export type Instrument =; export type Position =; export type Portfolio =; export type Trade =; export type AppState =; export type RouteState =; export type QuizResult =; export type LeaderboardEntry =
 - date.ts: export function todayKst(): string; export function toDayIndex(dateStr: string): number; export function addYears(dateStr: string, years: number): string; export function endOfMonth(dateStr: string): string; export function getKSTDate(): string; export function parseKSTDate(dateStr: string): Date; export function addDaysKST(dateStr: string, days: number): string
 - priceEngine.ts: export function getClose(symbol: string, dateStr: string): number; export const getPriceForInstrument: (instrumentId: string, dateStr: string) => number = getClose; export function getDailySeries(symbol: string): PricePoint[]; export function getMonthlySeries(symbol: string): PricePoint[]
-- storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
+- storage.ts: export const STORAGE_KEYS =; export function loadAccount(): Account; export function saveAccount(account: Account, onQuotaExceeded?: QuotaExceededHandler): void; export function loadPositions(): PositionMap; export function savePositions(positions: PositionMap, onQuotaExceeded?: QuotaExceededHandler): void; export function loadTrades(): Trade[]; export function saveTrades(trades: Trade[], onQuotaExceeded?: QuotaExceededHandler): void; export function loadStreak(): StreakState
 - types.ts: export type InstrumentType = "STOCK" | "ETF"; export interface Instrument; export interface PricePoint; export interface Account; export interface Position; export type PositionMap = Record<string, Position>; export type TradeSide = "BUY" | "SELL"; export interface Trade
 - utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string; export function formatPercent(decimal: number, decimals = 2): string; export function formatDate(dateStr: string): string
 
@@ -264,6 +264,7 @@ export interface AppMeta {
 
 ### Module Dependencies (import graph)
   lib/priceEngine.ts → imports: lib/types, data/instruments, lib/date
+  lib/storage.ts → imports: lib/types
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)

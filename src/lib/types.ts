@@ -74,34 +74,32 @@ export type BacktestYears = 1 | 3 | 5 | 10;
 export interface BacktestPreset {
   id: string;
   name: string;
-  description: string;
-  symbols: string[];
-  startCapital: number;
+  items: PresetItem[]; // 1~5개, weight 합계 === 100
   years: BacktestYears;
-  riskType: RiskType;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO8601
 }
 
 // ── BacktestResult ────────────────────────────────────────────
 export interface YearlyReturn {
   year: number;
-  return: number;
+  returnPct: number;
 }
 
 export interface BacktestResult {
-  id: string;
   presetId: string;
   years: BacktestYears;
-  startCapital: number;
-  endCapital: number;
-  trades: Trade[];
-  returns: YearlyReturn[];
-  maxDrawdown: number;
-  sharpeRatio: number;
-  winRate: number;
-  riskType: RiskType;
-  createdAt: Date;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  initialAmount: 10000000; // 고정 1,000만원
+  finalAmount: number; // 원
+  totalReturnPct: number; // 소수 2자리
+  cagrPct: number; // 소수 2자리
+  mddPct: number; // 음수, 소수 2자리
+  sharpe: number; // 소수 2자리
+  volatilityPct: number; // 연환산 변동성, 소수 2자리
+  monthlyEquity: number[]; // 월말 평가금액 시계열 (years*12+1 개)
+  yearly: YearlyReturn[];
+  computedAt: string; // ISO8601
 }
 
 // ── QuizResult ────────────────────────────────────────────────
