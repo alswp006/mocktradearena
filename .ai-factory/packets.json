@@ -1,0 +1,735 @@
+[
+  {
+    "id": "0001",
+    "title": "엔티티 타입 + RouteState 계약 정의",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "SPEC Data Models의 모든 인터페이스와 페이지 간 navigate state 계약을 순수 타입 파일로 정의한다. 런타임 코드(함수/상수) 없이 type/interface만 export하며, 이후 모든 패킷이 이 파일을 단일 소스로 import해 형태 불일치를 컴파일 타임에 잡도록 강제한다. STORAGE_KEYS 상수는 storage 패킷 소관이므로 넣지 않는다.",
+      "acceptance_criteria": [
+        "InstrumentType, Instrument, PricePoint, Account, Position, PositionMap, TradeSide, Trade, StreakState, PresetItem, BacktestPreset, YearlyReturn, BacktestResult, RiskType, QuizResult, LeaderboardEntry, AppMeta, BacktestYears가 모두 export된다",
+        "BacktestYears가 `1 | 3 | 5 | 10` 리터럴 유니온으로 정의되고 BacktestPreset.years/BacktestResult.years가 이를 사용한다",
+        "RouteState 타입이 '/', '/market', '/trade/:symbol', '/portfolio', '/backtest', '/backtest/result', '/quiz', '/quiz/result', '/leaderboard' 9개 키를 정확히 가진다",
+        "값(value) export가 0개다 — grep -E '^export (const|function|class|let)' src/lib/types.ts 결과 0줄",
+        "npx tsc --noEmit 통과, npm run build 성공"
+      ]
+    },
+    "covers": [
+      "기반 계약(F1~F8 선행)"
+    ],
+    "files": [
+      "src/lib/types.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 0 error",
+      "vite build 성공",
+      "런타임 코드 0줄"
+    ],
+    "depends_on": [],
+    "db_schema": "타입 정의만 — Account{cash,lastGrantDate,totalGranted,createdAt}, Position{symbol,qty,avgPrice}, Trade{id,symbol,name,side,qty,price,fee,amount,tradedAt} 등 SPEC Data Models 전체",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0002",
+    "title": "종목 마스터 20종목 + KST 날짜 유틸",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "주식 10 + ETF 10, 총 20개 Instrument 상수 배열을 번들 데이터로 작성하고 O(1) 조회 맵과 헬퍼를 export한다. 함께 KST 기준 YYYY-MM-DD 문자열 날짜 유틸(오늘, 기준일 2016-01-01로부터의 일 인덱스, 연 가감, 월말)을 순수 함수로 구현한다. localStorage/네트워크 접근 0건.",
+      "acceptance_criteria": [
+        "INSTRUMENTS 길이가 정확히 20이고 STOCK 10개, ETF 10개다",
+        "모든 symbol이 /^\\d{6}$/ 매칭, new Set(symbols).size === 20, 이름에 '삼성' 포함 종목이 2개 이상(삼성전자, 삼성바이오로직스)",
+        "basePrice는 정수 ≥ 1000, annualDrift는 -0.1~0.2, annualVol은 0.05~0.5 범위다",
+        "getInstrument('999999')가 throw 없이 undefined 반환, INSTRUMENT_MAP['005930'].name === '삼성전자'",
+        "todayKst()가 10자 'YYYY-MM-DD' 반환, toDayIndex('2016-01-01')===0, toDayIndex('2016-01-02')===1, endOfMonth('2024-02-10')==='2024-02-29'"
+      ]
+    },
+    "covers": [
+      "F1-AC2"
+    ],
+    "files": [
+      "src/data/instruments.ts",
+      "src/lib/date.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "검증용 콘솔 로그 제거",
+      "localStorage 호출 0건"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "Instrument 번들 상수(20개) — localStorage 미저장",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0003",
+    "title": "결정적 가격 엔진 (hash32·mulberry32·Box–Muller)",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "(symbol, date) → 정수 가격을 반환하는 결정적 GBM 가격 엔진을 구현한다. 시드는 hash32(symbol+'|'+dayIndex)만 사용하고 Math.random/Date.now를 쓰지 않아 언제 어디서 호출해도 동일 값을 반환한다. 일간 시리즈는 모듈 스코프 Map에 심볼별 1회만 캐시하며 localStorage에 저장하지 않는다.",
+      "acceptance_criteria": [
+        "getClose('005930','2024-03-15') 3회 호출 결과가 완전히 동일하고 Number.isInteger === true, 값 >= 100이다",
+        "소스 내 Math.random(), Date.now(), 인자 없는 new Date() 호출이 0건이다",
+        "close_0 = basePrice(기준일 2016-01-01), r_t = drift/252 + vol/Math.sqrt(252)*z_t, close_t = Math.max(100, Math.floor(close_{t-1}*(1+r_t)))로 구현된다",
+        "getDailySeries('005930') 2회 호출 시 두 번째는 캐시 히트로 재계산 0회이며 반환 참조가 동일하다",
+        "getMonthlySeries가 각 월 마지막 캘린더 일자를 샘플링하고, 마스터에 없는 심볼에 getClose는 throw 없이 0을 반환한다"
+      ]
+    },
+    "covers": [
+      "F1-AC1"
+    ],
+    "files": [
+      "src/lib/priceEngine.ts"
+    ],
+    "definition_of_done": [
+      "20심볼 전체 일간 시리즈 계산 200ms 이내(측정 후 로그 제거)",
+      "localStorage 쓰기 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0002"
+    ],
+    "db_schema": "PricePoint{date,close} — 메모리 Map 캐시 전용, localStorage 미저장",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0004",
+    "title": "localStorage 안전 래퍼 (파싱 복구·Quota 처리)",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "모든 저장소 접근의 단일 게이트를 구현한다. mta: 프리픽스 키 상수, 안전 read/write, 손상 JSON 자동 복구, QuotaExceeded 시 거래내역 트림 후 1회 재시도를 한 곳에 가둔다. 엔티티별 load/save 함수를 export해 상위 계층이 localStorage에 직접 접근하지 않게 한다.",
+      "acceptance_criteria": [
+        "STORAGE_KEYS가 mta:meta, mta:account, mta:positions, mta:trades, mta:streak, mta:presets, mta:lastBacktest, mta:quiz, mta:leaderboardSeed 9개를 export한다",
+        "localStorage.setItem('mta:positions','{not-json') 상태에서 loadPositions()가 예외 없이 {}를 반환하고 저장값이 '{}'로 덮어써진다",
+        "safeWrite가 QuotaExceededError catch 시 mta:trades 오래된 100건 삭제 후 1회 재시도하고, 재시도 실패 시 onQuotaExceeded 콜백만 호출하며 throw하지 않는다",
+        "saveTrades가 저장 전 최신 500건으로 트림한다(600건 저장 → 읽으면 500건, 배열 끝이 최신)",
+        "9개 엔티티 load/save 함수가 모두 export되고 각 fallback 기본값이 SPEC 초기값과 일치한다"
+      ]
+    },
+    "covers": [
+      "F1-AC4",
+      "F1-AC5",
+      "F5-AC7"
+    ],
+    "files": [
+      "src/lib/storage.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "console.error 호출 0회",
+      "새로고침 후 저장값 복원 확인"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "mta:account/positions/trades(최대500)/streak/presets(최대10)/lastBacktest/quiz/leaderboardSeed/meta",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0005",
+    "title": "부트스트랩·일일지급·스트릭 + 거래 체결 엔진",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "최초 진입 초기화와 KST 날짜 변경 시 가상자금 지급/출석 스트릭 갱신 로직, 그리고 매수/매도 검증·수수료·평균단가 갱신을 담당하는 거래 체결 엔진을 구현한다. 둘 다 계좌 현금을 변경하는 순수 로직 계층이며 UI 없이 결과 객체만 반환한다.",
+      "acceptance_criteria": [
+        "bootstrap() 시 mta:account 부재면 {cash:1000000, lastGrantDate: todayKst(), totalGranted:1000000, createdAt}, mta:meta 부재면 {schemaVersion:1, disclaimerSeen:false, onboardedAt, rewardUnlockedPresetIds:[]}가 생성된다",
+        "lastGrantDate === today면 {granted:false, grantAmount:0, bonusAmount:0}이고 cash·lastGrantDate 불변이며 2회 연속 호출해도 동일하다",
+        "lastGrantDate > today(시계 역행)는 문자열 사전순 비교로 granted:false, cash 불변. lastGrantDate < today면 cash += 1000000, totalGranted += 1000000, lastGrantDate = today",
+        "스트릭: 어제면 currentStreak += 1, 그 이전이면 1로 리셋, longestStreak = Math.max(기존,current). 보너스 7일↑ 500000 / 5일↑ 300000 / 3일↑ 100000 / else 0을 cash와 totalBonus에 가산",
+        "executeTrade가 현금 부족 시 {ok:false, reason:'INSUFFICIENT_CASH'}, 보유수량 초과 매도 시 {ok:false, reason:'INSUFFICIENT_QTY'}로 체결 없이 거부하고, 성공 시 avgPrice가 Math.floor 정수로 갱신되며 Trade가 mta:trades 끝에 추가된다"
+      ]
+    },
+    "covers": [
+      "F1-AC3",
+      "F2-AC1",
+      "F2-AC8",
+      "F4-AC1"
+    ],
+    "files": [
+      "src/lib/checkin.ts",
+      "src/lib/tradeEngine.ts"
+    ],
+    "definition_of_done": [
+      "검증 3건 통과: (cash 250000/last 2026-08-30/today 2026-08-31 → cash 1250000), (streak 2 → streak 3, totalBonus 100000), (last 2026-08-28 → streak 1, bonus 0)",
+      "모든 금액 Math.floor 정수 연산",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0004"
+    ],
+    "db_schema": "mta:account, mta:streak, mta:positions, mta:trades 갱신. DailyCheckInResult{granted,grantAmount,bonusAmount,streak,isNewStreakMilestone}",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0006",
+    "title": "앱 전역 상태 Provider (AppStateContext)",
+    "epic": "Epic 1. 데이터/스토리지",
+    "task": {
+      "description": "계좌·보유종목·거래내역·스트릭·메타를 담는 React Context Provider와 useAppState 훅을 구현한다. 마운트 시 bootstrap()과 runDailyCheckIn(todayKst())을 정확히 1회만 실행하고 그 결과를 상태로 노출해 홈 화면이 Toast/BottomSheet를 띄울 수 있게 한다. 모든 쓰기는 storage 래퍼를 경유한다.",
+      "acceptance_criteria": [
+        "AppStateProvider와 useAppState가 export되고 { account, positions, trades, streak, meta, checkInResult, refresh, buy, sell, setDisclaimerSeen, unlockReport }를 노출한다",
+        "React StrictMode 이중 마운트에서도 runDailyCheckIn이 1회만 반영된다(ref 가드) — 새로고침 2회 후 cash가 1일치만 증가",
+        "Provider 밖에서 useAppState 호출 시 명확한 메시지로 throw한다",
+        "buy/sell 호출 후 상태가 즉시 갱신되고 localStorage에도 동일 값이 반영되며 새로고침 후 복원된다",
+        "setDisclaimerSeen()이 mta:meta.disclaimerSeen을 true로 저장하고, unlockReport(presetId)가 rewardUnlockedPresetIds에 중복 없이 최대 20개까지 추가한다"
+      ]
+    },
+    "covers": [
+      "F1-AC3",
+      "F2-AC2",
+      "F7-AC5"
+    ],
+    "files": [
+      "src/store/AppStateContext.tsx"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "localStorage 직접 접근 없이 storage 래퍼만 사용",
+      "context value를 useMemo로 감싸 불필요한 리렌더 방지"
+    ],
+    "depends_on": [
+      "0003",
+      "0004",
+      "0005"
+    ],
+    "db_schema": "mta:account, mta:positions, mta:trades, mta:streak, mta:meta 단일 진입 상태 계층",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0007",
+    "title": "백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)",
+    "epic": "Epic 2. 도메인 계산 엔진",
+    "task": {
+      "description": "프리셋(종목·비중·기간)을 받아 초기 1,000만원 매수 후 보유 기준 월말 평가금액 시계열을 만들고 총수익률·CAGR·MDD·샤프지수·연환산 변동성·연도별 수익률을 계산해 BacktestResult를 반환하는 순수 함수를 구현한다. 배당·거래비용·리밸런싱 미반영, 무위험수익률 연 3.0% 고정.",
+      "acceptance_criteria": [
+        "runBacktest(preset)이 monthlyEquity 길이 === years*12+1인 결과를 반환하고 initialAmount === 10000000, finalAmount는 정수다",
+        "totalReturnPct, cagrPct, mddPct, sharpe, volatilityPct가 모두 소수 2자리로 반올림되고 mddPct는 0 이하다",
+        "동일 프리셋으로 3회 호출 시 모든 숫자 필드가 완전히 동일하다",
+        "yearly 배열 길이가 years와 같고 각 항목이 {year, returnPct} 형태다",
+        "weight 합계가 100이 아니거나 items가 0개 또는 6개 이상이면 계산 없이 {ok:false, reason}으로 거부하고 throw하지 않는다"
+      ]
+    },
+    "covers": [
+      "F6-AC3",
+      "F6-AC4",
+      "F7-AC1",
+      "F7-AC2"
+    ],
+    "files": [
+      "src/lib/backtest.ts"
+    ],
+    "definition_of_done": [
+      "10년 5종목 백테스트 200ms 이내",
+      "Math.random/Date.now 사용 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003"
+    ],
+    "db_schema": "BacktestResult(계산 산출물) — 마지막 1건만 mta:lastBacktest 캐시",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0008",
+    "title": "퀴즈 채점 규칙 + 리더보드 시드 생성",
+    "epic": "Epic 2. 도메인 계산 엔진",
+    "task": {
+      "description": "8문항 4지선다 투자성향 퀴즈 문항 데이터와 결정적 채점 규칙(점수→RiskType→추천 종목 3개)을 구현하고, 랭킹 화면용 봇 49명 시드를 결정적으로 생성해 mta:leaderboardSeed에 1회 저장 후 재사용하는 로직을 구현한다. 전부 룰 기반이며 생성형 AI를 사용하지 않는다.",
+      "acceptance_criteria": [
+        "QUIZ_QUESTIONS가 정확히 8문항, 각 문항 선택지 4개, 각 선택지 점수 1~4다",
+        "scoreQuiz(answers)가 score 8~32과 STABLE/STABLE_GROWTH/NEUTRAL/ACTIVE/AGGRESSIVE 중 하나의 type을 반환한다",
+        "recommendedSymbols가 정확히 3개이고 모두 INSTRUMENT_MAP에 존재하며 동일 answers에 항상 동일한 3개를 반환한다",
+        "getLeaderboardSeed()가 최초 호출 시 봇 49명(bot-01~bot-49, 한글 닉네임, 일부 isFriend true)을 생성 저장하고 2회차부터 저장값을 그대로 반환한다",
+        "buildLeaderboard(myTotalAsset, myReturnPct, myStreak)이 'me' 포함 50개를 totalAssetKrw 내림차순 정렬로 반환하고 isMe === true가 정확히 1개다"
+      ]
+    },
+    "covers": [
+      "F8-AC1",
+      "F8-AC2",
+      "F8-AC4",
+      "F8-AC5"
+    ],
+    "files": [
+      "src/lib/quiz.ts",
+      "src/lib/leaderboard.ts"
+    ],
+    "definition_of_done": [
+      "tsc --noEmit 통과",
+      "봇 시드 생성에 Math.random 미사용(고정 시드)",
+      "생성형 AI 호출 0건"
+    ],
+    "depends_on": [
+      "0003",
+      "0004"
+    ],
+    "db_schema": "mta:quiz(QuizResult), mta:leaderboardSeed(LeaderboardEntry[49])",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": ""
+  },
+  {
+    "id": "0009",
+    "title": "홈 화면 (S1) — 히어로·스트릭·메뉴 카드·고지",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "총 평가자산 히어로, 최근 30일 자산 추이 스파크라인, 연속 출석 카드, 보유 종목 요약(또는 빈 상태), 메뉴 카드 4개를 담은 홈 화면을 구현한다. 마운트 시 일일 지급/스트릭 결과를 Toast·BottomSheet로 알리고 최초 진입 시 모의투자 고지 다이얼로그를 1회 노출한다.",
+      "acceptance_criteria": [
+        "총 평가자산 = 현금 + Σ(보유수량 × 오늘 종가)로 계산되어 원 단위 콤마로 표시된다",
+        "보유 종목 0개면 data-testid='home-holdings-empty' EmptyState가 보이고 '모의매매 시작하기' 탭 시 /market으로 이동한다",
+        "일일 지급이 발생한 경우에만 Toast '오늘의 가상자금 1,000,000원이 지급됐어요'가 뜨고 같은 날 재진입 시에는 뜨지 않는다",
+        "mta:meta.disclaimerSeen이 false면 AlertDialog가 뜨고 '확인' 탭 시 true로 저장되어 재진입 시 다시 뜨지 않는다",
+        "하단에 '본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.' 문구가 항상 노출된다"
+      ]
+    },
+    "covers": [
+      "F2-AC1",
+      "F2-AC2",
+      "F2-AC3",
+      "F2-AC4"
+    ],
+    "files": [
+      "src/pages/Home.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "HEX 하드코딩 0건",
+      "터치 타깃 ≥ 44px",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006"
+    ],
+    "db_schema": "읽기: mta:account, mta:positions, mta:streak, mta:meta / 쓰기: mta:meta.disclaimerSeen",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel(A+F+C). TDS: Top, Paragraph, Spacing, Card, Button, ListRow, Chip, AlertDialog, BottomSheet, Toast, Badge / 템플릿: ScreenScaffold, SummaryHero, Amount, Sparkline, EmptyState, Asset.ContentIcon, FloatingTabBar, AdSlot.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>MockTradeArena</Top.TitleParagraph>} /> <SummaryHero data-testid=\"home-asset-hero\" label=\"총 평가자산\" value={<Amount value={totalAsset} unit=\"원\" typography=\"t2\" />} caption={<Badge>{returnPct>=0?`+${returnPct}%`:`${returnPct}%`}</Badge>} /> <Spacing size={16} /> <Sparkline data-testid=\"home-trend-sparkline\" points={asset30d} /> <Spacing size={24} /> <Paragraph.Text typography=\"t4\">연속 출석</Paragraph.Text> <Spacing size={12} /> <Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top={`${streak}일 연속 출석 중이에요`} bottom={`누적 보너스 ${totalBonus.toLocaleString('ko-KR')}원`} />} right={<Chip label={`${streak}일`} variant=\"filled\" />} /></Card> <Spacing size={24} /> <Paragraph.Text typography=\"t4\">보유 종목</Paragraph.Text> <Spacing size={12} /> {hasPositions ? <Card><ListRow onClick={goPortfolio} contents={<ListRow.Texts type=\"2RowTypeA\" top={`${count}개 종목 보유 중`} bottom={`평가손익 ${pnlText}`} />} /></Card> : <div data-testid=\"home-holdings-empty\"><EmptyState title=\"아직 보유 종목이 없어요\" description=\"가상자금으로 첫 매매를 시작해 보세요\" action={<Button variant=\"weak\" display=\"block\" onClick={goMarket}>모의매매 시작하기</Button>} /></div>} <Spacing size={24} /> {MENUS.map(m => <Card data-testid=\"home-menu-card\" key={m.key}><ListRow onClick={m.go} contents={<ListRow.Texts type=\"2RowTypeA\" top={m.title} bottom={m.desc} />} right={<Chip label={m.badge} variant=\"outlined\" />} /></Card>)} (마켓/백테스트/투자성향 퀴즈/랭킹, 각 높이 ≥72px) <Spacing size={16} /> <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <FloatingTabBar /> <AlertDialog open={!disclaimerSeen} title=\"모의투자 안내\" description=\"본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.\" alertButton={<AlertDialog.AlertButton onClick={confirmDisclaimer}>확인</AlertDialog.AlertButton>} onClose={confirmDisclaimer} /> <BottomSheet open={showStreakBonus} onClose={closeBonus}>{`${streak}일 연속 출석! 보너스 ${bonus.toLocaleString('ko-KR')}원`}</BottomSheet> <Toast open={grantToast} position=\"bottom\" onClose={closeToast} /> </ScreenScaffold>.\nStates: Loading=SummaryHero/Sparkline/메뉴카드 Skeleton, Empty=home-holdings-empty EmptyState, Error='데이터를 불러오지 못했어요' + weak Button '다시 시도'.\nInteractions: 마운트 시 일일지급/스트릭 판정 → 지급 시 Toast + generateHapticFeedback({type:'success'}); 스트릭 보너스 → BottomSheet + haptic success; 메뉴 카드 탭 → haptic tickWeak → navigate('/market'|'/backtest'|'/quiz'|'/leaderboard'); 탭 전환 haptic tickWeak."
+  },
+  {
+    "id": "0010",
+    "title": "마켓 화면 (S2) — 목록·탭 필터·검색",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "20개 종목을 오늘 종가·등락률과 함께 리스트로 보여주고 전체/주식/ETF 탭 필터와 종목명·6자리 코드 검색을 제공하는 마켓 화면을 구현한다. 행 탭 시 주문 화면으로 이동하며 검색 결과가 없으면 빈 상태를 노출한다.",
+      "acceptance_criteria": [
+        "초기 진입 시 20개 종목이 모두 렌더되고 각 행에 종목명, '코드 · 섹터', 오늘 종가(콤마), 등락률이 표시된다",
+        "'주식' 탭 10개, 'ETF' 탭 10개만 남고 '전체' 탭에서 20개로 복귀한다",
+        "검색어 '삼성' 입력 시 이름에 삼성을 포함하는 항목만 2개 이상 남고 '005930' 입력 시 삼성전자 1건만 남는다",
+        "검색 결과 0건이면 data-testid='market-empty' EmptyState('검색 결과가 없어요')가 보인다",
+        "행 탭 시 navigate(`/trade/${symbol}`, { state: { symbol, from: 'market' } })로 이동하고 행 높이가 56px 이상이다"
+      ]
+    },
+    "covers": [
+      "F3-AC1",
+      "F3-AC2",
+      "F3-AC3"
+    ],
+    "files": [
+      "src/pages/Market.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "HEX 하드코딩 0건",
+      "navigate state가 RouteState 타입과 일치",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0006"
+    ],
+    "db_schema": "읽기 전용 — INSTRUMENTS + getClose(symbol, todayKst()). localStorage 쓰기 없음",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: PageShell(B+C). TDS: Top, Tab, TextField, ListRow, Chip, Badge, Spacing, Paragraph / 템플릿: ScreenScaffold, Sparkline, EmptyState, Asset.ContentIcon, AdSlot, FloatingTabBar.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>마켓</Top.TitleParagraph>} /> <TextField variant=\"box\" label=\"종목 검색\" value={q} onChange={setQ} help=\"종목명 또는 6자리 코드로 찾아요\" /> <Spacing size={12} /> <Tab onChange={setTabIndex}><Tab.Item selected={tabIndex===0}>전체</Tab.Item><Tab.Item selected={tabIndex===1}>주식</Tab.Item><Tab.Item selected={tabIndex===2}>ETF</Tab.Item></Tab> <Spacing size={8} /> <div data-testid=\"market-list\">{rows.length===0 ? <div data-testid=\"market-empty\"><EmptyState title=\"검색 결과가 없어요\" description=\"다른 종목명이나 코드로 찾아보세요\" /></div> : rows.map(r => <ListRow key={r.symbol} onClick={() => goTrade(r.symbol)} contents={<ListRow.Texts type=\"2RowTypeA\" top={r.name} bottom={`${r.symbol} · ${r.sector}`} />} right={<div style={{display:'flex',alignItems:'center',gap:8}}><Sparkline points={r.d60} /><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end'}}><Paragraph.Text typography=\"t6\">{r.close.toLocaleString('ko-KR')}원</Paragraph.Text><Badge>{r.changePct>=0?`+${r.changePct}%`:`${r.changePct}%`}</Badge></div></div>} />)}</div> <Spacing size={16} /> <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <FloatingTabBar /> </ScreenScaffold>.\nStates: Loading=ListRow Skeleton 6줄, Empty=market-empty EmptyState, Error=안내 문구 + '다시 시도' weak Button.\nInteractions: 탭 전환/행 탭 haptic tickWeak; 행 탭 → navigate(`/trade/${symbol}`, {state:{symbol, from:'market'}}); 검색은 즉시 필터(20건 규모)."
+  },
+  {
+    "id": "0011",
+    "title": "주문 화면 (S3) — 매수/매도·미리보기·체결",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "종목 상세(현재가·섹터·차트)와 매수/매도 탭, 수량 입력, 예상 체결금액·수수료 미리보기, 하단 고정 체결 버튼을 갖춘 주문 화면을 구현한다. 현금 부족·보유수량 초과·수량 0 이하를 TextField 에러 상태로 차단하고 체결 성공 시 포트폴리오로 이동한다.",
+      "acceptance_criteria": [
+        "URL 파라미터 symbol이 마스터에 없으면 '종목을 찾을 수 없어요' 안내와 '마켓으로 돌아가기' 버튼만 렌더하고 크래시하지 않는다",
+        "수량 입력 시 예상 체결금액(수량×현재가), 수수료, 거래 후 잔액이 실시간 갱신된다",
+        "매수 필요 금액이 보유 현금 초과면 TextField 에러 문구가 뜨고 체결 버튼이 disabled다",
+        "매도 수량이 보유 수량 초과면 에러 문구가 뜨고 버튼이 disabled이며, 미보유 종목은 매도 탭에서 비활성 안내를 보여준다",
+        "체결 성공 시 Toast + haptic 'success' 후 navigate('/portfolio', { state: { justTradedSymbol: symbol } })로 이동하고, 새로고침 후에도 거래내역·보유종목에 반영되어 있다"
+      ]
+    },
+    "covers": [
+      "F4-AC1",
+      "F4-AC2",
+      "F4-AC3",
+      "F4-AC4"
+    ],
+    "files": [
+      "src/pages/Trade.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "수량 입력 inputMode='numeric'",
+      "하단 고정 영역에 paddingBottom: 'calc(16px + env(safe-area-inset-bottom))'",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0005",
+      "0006"
+    ],
+    "db_schema": "쓰기: mta:account.cash, mta:positions, mta:trades(최대 500건)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FormFlow(D). TDS: Top(뒤로가기), Tab, TextField, Paragraph, Spacing, Card, ListRow, Button, Toast, Chip / 템플릿: ScreenScaffold, SubmitFooter, Amount, Sparkline.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>{instrument.name}</Top.TitleParagraph>} /> <Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top={`${close.toLocaleString('ko-KR')}원`} bottom={`${symbol} · ${sector}`} />} right={<Chip label={changeText} variant=\"filled\" />} /></Card> <Spacing size={16} /> <Sparkline points={d180} /> <Spacing size={24} /> <Tab onChange={setSide}><Tab.Item selected={side==='BUY'}>매수</Tab.Item><Tab.Item selected={side==='SELL'}>매도</Tab.Item></Tab> <Spacing size={16} /> <TextField variant=\"box\" label=\"수량\" value={qty} onChange={setQty} inputMode=\"numeric\" hasError={!!error} help={error ?? `주문 가능 ${maxQty}주`} /> <Spacing size={16} /> <Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"예상 체결금액\" bottom={`${amount.toLocaleString('ko-KR')}원`} />} /><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"수수료·세금\" bottom={`${fee.toLocaleString('ko-KR')}원`} />} /><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"거래 후 잔액\" bottom={`${afterCash.toLocaleString('ko-KR')}원`} />} /></Card> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <SubmitFooter><Button display=\"block\" disabled={!canSubmit} onClick={submit}>{side==='BUY'?'매수하기':'매도하기'}</Button></SubmitFooter> <Toast open={toastOpen} position=\"bottom\" onClose={closeToast} /> </ScreenScaffold>.\nStates: Loading=Card/Sparkline Skeleton; Invalid symbol='종목을 찾을 수 없어요' + weak Button '마켓으로 돌아가기'; Error=TextField hasError + help('보유 현금이 부족해요'/'보유 수량보다 많아요'/'1주 이상 입력해 주세요').\nInteractions: 탭 전환 haptic tickWeak; 체결 haptic success → Toast → navigate('/portfolio', {state:{justTradedSymbol:symbol}}); 키보드 오픈 시 SubmitFooter 가림 방지 하단 패딩."
+  },
+  {
+    "id": "0012",
+    "title": "포트폴리오 (S4) — 보유종목 탭",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "총 평가자산·현금·총 평가손익 요약과 보유종목 리스트(종목명, 수량, 평균단가, 현재가, 평가손익/수익률)를 보여주는 포트폴리오 화면을 구현한다. 상단에 보유종목/거래내역 Tab 골격을 만들고 이번 패킷은 보유종목 탭을 완성하며 거래내역 탭 자리에는 placeholder를 둔다.",
+      "acceptance_criteria": [
+        "총 평가자산 = 현금 + Σ(qty × 오늘 종가), 총 평가손익 = Σ((현재가-평균단가)×qty)로 계산되어 콤마 표기로 표시된다",
+        "보유종목 0개면 EmptyState('아직 보유 종목이 없어요')와 '마켓 보러가기' 버튼이 보이고 탭 시 /market으로 이동한다",
+        "각 행에 종목명·보유수량·평균단가·평가금액·수익률(소수 2자리)이 표시되고 탭 시 /trade/:symbol로 이동한다",
+        "location.state.justTradedSymbol이 있으면 해당 행에 Chip '방금 거래' 하이라이트가 표시된다",
+        "보유종목/거래내역 Tab이 렌더되어 전환이 동작하고 하단에 모의투자 고지 문구가 노출된다"
+      ]
+    },
+    "covers": [
+      "F5-AC1",
+      "F5-AC2",
+      "F5-AC3"
+    ],
+    "files": [
+      "src/pages/Portfolio.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "손익 색상은 var(--tds-color-*)만 사용",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0003",
+      "0006"
+    ],
+    "db_schema": "읽기: mta:account, mta:positions + getClose로 현재가 산출",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: StatusPanel + PageShell. TDS: Top, Tab, Card, ListRow, Badge, Chip, Paragraph, Spacing, Button / 템플릿: ScreenScaffold, SummaryHero, Amount, EmptyState, Asset.ContentIcon, AdSlot, FloatingTabBar.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>포트폴리오</Top.TitleParagraph>} /> <SummaryHero label=\"총 평가자산\" value={<Amount value={totalAsset} unit=\"원\" typography=\"t2\" />} caption={<Badge>{pnlText}</Badge>} /> <Spacing size={12} /> <Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"보유 현금\" bottom={`${cash.toLocaleString('ko-KR')}원`} />} /><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"총 평가손익\" bottom={`${pnl.toLocaleString('ko-KR')}원 (${pnlPct}%)`} />} /></Card> <Spacing size={20} /> <Tab onChange={setTabIndex}><Tab.Item selected={tabIndex===0}>보유종목</Tab.Item><Tab.Item selected={tabIndex===1}>거래내역</Tab.Item></Tab> <Spacing size={12} /> {tabIndex===0 && (positions.length===0 ? <div data-testid=\"portfolio-empty\"><EmptyState title=\"아직 보유 종목이 없어요\" description=\"마켓에서 첫 종목을 사보세요\" action={<Button variant=\"weak\" display=\"block\" onClick={goMarket}>마켓 보러가기</Button>} /></div> : positions.map(p => <Card key={p.symbol}><ListRow onClick={() => goTrade(p.symbol)} contents={<ListRow.Texts type=\"2RowTypeA\" top={p.name} bottom={`${p.qty}주 · 평균 ${p.avgPrice.toLocaleString('ko-KR')}원`} />} right={<div style={{display:'flex',flexDirection:'column',alignItems:'flex-end'}}><Paragraph.Text typography=\"t6\">{p.evalAmount.toLocaleString('ko-KR')}원</Paragraph.Text><Badge>{p.pnlPct>=0?`+${p.pnlPct}%`:`${p.pnlPct}%`}</Badge></div>} /></Card>))} {tabIndex===1 && <div data-testid=\"portfolio-history-slot\" />} <Spacing size={16} /> <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <FloatingTabBar /> </ScreenScaffold>.\nStates: Loading=SummaryHero/Card Skeleton, Empty=portfolio-empty EmptyState, Error=안내 + '다시 시도'.\nInteractions: 탭 전환 haptic tickWeak; 행 탭 → navigate(`/trade/${symbol}`, {state:{symbol, from:'portfolio'}})."
+  },
+  {
+    "id": "0013",
+    "title": "포트폴리오 거래내역 탭 + 대량 리스트 처리",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "포트폴리오의 거래내역 탭 내용을 별도 컴포넌트로 구현해 Portfolio 화면의 placeholder 자리에 연결한다. 최신순 정렬, 매수/매도 구분, 체결가·수량·수수료·일시 표시, 50건 이상일 때 부분 렌더로 스크롤 성능을 확보하고 빈 상태를 제공한다.",
+      "acceptance_criteria": [
+        "거래내역이 tradedAt 내림차순으로 정렬되고 각 행에 매수/매도, 종목명, '수량주 · 체결가원', 수수료, 일시(YYYY-MM-DD HH:mm)가 표시된다",
+        "거래내역 0건이면 EmptyState('아직 거래 내역이 없어요' + '마켓 보러가기' 버튼)가 표시된다",
+        "거래 500건 상태에서 초기 렌더는 최대 30건만 DOM에 생성하고 '더 보기'로 30건씩 추가된다",
+        "매수/매도가 Chip label '매수'/'매도'로 시각 구분되며 색상은 TDS 토큰만 사용한다",
+        "Portfolio.tsx의 거래내역 placeholder가 이 컴포넌트로 교체되고, 보유종목 탭 로직과 요약 계산은 변경되지 않는다"
+      ]
+    },
+    "covers": [
+      "F5-AC4",
+      "F5-AC5",
+      "F5-AC7"
+    ],
+    "files": [
+      "src/components/TradeHistoryTab.tsx",
+      "src/pages/Portfolio.tsx"
+    ],
+    "definition_of_done": [
+      "Portfolio.tsx 수정은 import 추가 + placeholder 교체로 한정",
+      "TDS 외 UI 라이브러리 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0012"
+    ],
+    "db_schema": "읽기: mta:trades(Trade[] 최대 500, 배열 끝이 최신) — 렌더 시 역순",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: List(C). TDS: ListRow, Card, Chip, Badge, Paragraph, Spacing, Button / 템플릿: EmptyState, Asset.ContentIcon.\nLayout: <div data-testid=\"trade-history\">{trades.length===0 ? <EmptyState title=\"아직 거래 내역이 없어요\" description=\"첫 모의매매를 시작해 보세요\" action={<Button variant=\"weak\" display=\"block\" onClick={goMarket}>마켓 보러가기</Button>} /> : <>{visible.map(t => <ListRow key={t.id} left={<Chip label={t.side==='BUY'?'매수':'매도'} variant={t.side==='BUY'?'filled':'outlined'} />} contents={<ListRow.Texts type=\"2RowTypeA\" top={`${t.name} ${t.qty}주`} bottom={`${t.price.toLocaleString('ko-KR')}원 · 수수료 ${t.fee.toLocaleString('ko-KR')}원`} />} right={<Paragraph.Text typography=\"st13\" color=\"tertiary\">{formatKst(t.tradedAt)}</Paragraph.Text>} />)}<Spacing size={12} />{hasMore && <Button variant=\"weak\" display=\"block\" onClick={loadMore}>더 보기</Button>}</>}</div>.\nStates: Loading=ListRow Skeleton 5줄, Empty=EmptyState + weak Button, 대량=초기 30건 후 30건씩 추가.\nInteractions: '더 보기' 탭 haptic tickWeak 후 30건 추가 렌더."
+  },
+  {
+    "id": "0014",
+    "title": "백테스트 구성 화면 (S5) — 종목/비중·실행·프리셋",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "백테스트할 종목 1~5개를 고르고 정수 퍼센트 비중(합계 100)과 기간(1/3/5/10년)을 설정해 실행하는 화면을 구현한다. 비중 합계가 100이 아니면 실행을 막고, 실행 시 프리셋을 저장(최대 10개)한 뒤 결과 화면으로 이동하며 저장 목록에서 재실행·삭제가 가능하다.",
+      "acceptance_criteria": [
+        "종목은 최대 5개까지만 선택되고 6번째 시도 시 Toast '최대 5개까지 담을 수 있어요'가 뜨며 선택되지 않는다",
+        "비중 합계가 100이 아니면 '비중 합계를 100%로 맞춰주세요 (현재 N%)' 문구가 보이고 실행 버튼이 disabled다",
+        "기간 Chip은 1년/3년/5년/10년 중 하나만 선택되며 기본값은 3년이다",
+        "실행 시 프리셋이 mta:presets에 저장되고(11번째 저장 시 가장 오래된 1건 삭제) navigate('/backtest/result', { state: { presetId, years } })로 이동한다",
+        "저장 목록 항목 탭 시 해당 프리셋으로 결과 이동, 삭제 탭 시 목록과 localStorage에서 제거되며 새로고침 후에도 삭제 상태가 유지된다"
+      ]
+    },
+    "covers": [
+      "F6-AC1",
+      "F6-AC2",
+      "F6-AC5"
+    ],
+    "files": [
+      "src/pages/Backtest.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "프리셋 이름 1~20자 검증",
+      "navigate state가 RouteState 타입과 일치",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006",
+      "0007"
+    ],
+    "db_schema": "mta:presets(BacktestPreset[] 최대 10) — items 1~5개, weight 합 100, years 1|3|5|10",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FormFlow(D). TDS: Top, TextField, Chip, ListRow, Card, Button, Paragraph, Spacing, BottomSheet, Toast / 템플릿: ScreenScaffold, SubmitFooter, EmptyState, Asset.ContentIcon, AdSlot, FloatingTabBar.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>백테스트</Top.TitleParagraph>} /> <TextField variant=\"box\" label=\"포트폴리오 이름\" value={name} onChange={setName} help=\"1~20자로 지어주세요\" /> <Spacing size={16} /> <Paragraph.Text typography=\"t4\">종목 선택 (최대 5개)</Paragraph.Text> <Spacing size={12} /> <Button variant=\"weak\" display=\"block\" onClick={openPicker}>종목 담기</Button> <Spacing size={12} /> {items.map(it => <Card key={it.symbol}><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top={it.name} bottom={it.symbol} />} right={<div style={{display:'flex',alignItems:'center',gap:8}}><TextField variant=\"line\" value={String(it.weight)} inputMode=\"numeric\" onChange={v => setWeight(it.symbol, v)} /><Button variant=\"weak\" size=\"small\" onClick={() => remove(it.symbol)}>삭제</Button></div>} /></Card>)} <Spacing size={8} /> <Paragraph.Text typography=\"st13\" color={sum===100?'tertiary':'critical'}>{sum===100?'비중 합계 100%':`비중 합계를 100%로 맞춰주세요 (현재 ${sum}%)`}</Paragraph.Text> <Spacing size={20} /> <Paragraph.Text typography=\"t4\">기간</Paragraph.Text> <Spacing size={12} /> <div style={{display:'flex',gap:8}}>{[1,3,5,10].map(y => <Chip key={y} label={`${y}년`} variant={years===y?'filled':'outlined'} onClick={() => setYears(y)} />)}</div> <Spacing size={24} /> <Paragraph.Text typography=\"t4\">저장한 포트폴리오</Paragraph.Text> <Spacing size={12} /> {presets.length===0 ? <EmptyState title=\"저장한 포트폴리오가 없어요\" description=\"종목을 담고 백테스트를 실행해 보세요\" /> : presets.map(p => <Card key={p.id}><ListRow onClick={() => run(p)} contents={<ListRow.Texts type=\"2RowTypeA\" top={p.name} bottom={`${p.items.length}종목 · ${p.years}년`} />} right={<Button variant=\"weak\" size=\"small\" onClick={e => del(e, p.id)}>삭제</Button>} /></Card>)} <Spacing size={16} /> <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <SubmitFooter><Button display=\"block\" disabled={sum!==100||items.length===0} onClick={submit}>백테스트 실행하기</Button></SubmitFooter> <BottomSheet open={pickerOpen} onClose={closePicker}>{/* 20종목 ListRow 선택 */}</BottomSheet> <Toast open={toastOpen} position=\"bottom\" onClose={closeToast} /> </ScreenScaffold>.\nStates: Empty=프리셋 0건 EmptyState; Error=비중 불일치 문구 + 실행 버튼 disabled.\nInteractions: Chip/종목 선택 haptic tickWeak; 실행 haptic success → navigate('/backtest/result', {state:{presetId, years}})."
+  },
+  {
+    "id": "0015",
+    "title": "백테스트 리포트 (S6) — 무료 요약 + 리워드 게이팅",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "백테스트 결과 화면을 구현한다. 최종 평가금액·총수익률·CAGR과 월말 자산 추이는 무료로 보여주고 MDD·샤프지수·변동성·연도별 수익률 상세는 TossRewardAd로 게이팅한다. 광고 시청 완료 시 해당 프리셋을 해제 목록에 저장해 재진입 시 바로 열리며, location.state가 없으면 안전하게 복구한다.",
+      "acceptance_criteria": [
+        "location.state가 없거나 presetId가 mta:presets에 없으면 크래시 없이 '결과를 불러올 수 없어요' + '백테스트 다시 하기' 버튼을 렌더한다",
+        "무료 영역에 최종 평가금액(콤마), 총수익률(%), CAGR(%), 월말 자산 추이 차트, 초기 투자금 10,000,000원 표기가 보인다",
+        "상세 지표(MDD·샤프지수·연환산 변동성·연도별 수익률)는 해제 전 잠금 상태이며 TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID} 안에 있다",
+        "광고 시청 완료 시 상세가 즉시 보이고 mta:meta.rewardUnlockedPresetIds에 presetId가 추가되어 재진입 시 광고 없이 보인다",
+        "동일 프리셋을 3회 실행해도 표시 수치가 모두 동일하고 하단에 모의투자 고지 문구가 노출된다"
+      ]
+    },
+    "covers": [
+      "F7-AC1",
+      "F7-AC3",
+      "F7-AC4",
+      "F7-AC5"
+    ],
+    "files": [
+      "src/pages/BacktestResult.tsx"
+    ],
+    "definition_of_done": [
+      "TossRewardAd는 최종 payoff(상세 지표)만 게이팅",
+      "TDS 외 UI 라이브러리 0건",
+      "HEX 하드코딩 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006",
+      "0007"
+    ],
+    "db_schema": "읽기: mta:presets / 쓰기: mta:lastBacktest, mta:meta.rewardUnlockedPresetIds(최대 20)",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: ResultReport(A+E). TDS: Top, Card, ListRow, Badge, Chip, Paragraph, Spacing, Button, Toast / 템플릿: ScreenScaffold, SummaryHero, Amount, Sparkline, MiniBar, TossRewardAd, AdSlot, EmptyState.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>백테스트 결과</Top.TitleParagraph>} /> {!result ? <EmptyState title=\"결과를 불러올 수 없어요\" description=\"백테스트를 다시 실행해 주세요\" action={<Button variant=\"weak\" display=\"block\" onClick={goBacktest}>백테스트 다시 하기</Button>} /> : <><SummaryHero label=\"최종 평가금액\" value={<Amount value={result.finalAmount} unit=\"원\" typography=\"t2\" />} caption={<Badge>{`${result.totalReturnPct>=0?'+':''}${result.totalReturnPct}%`}</Badge>} /><Spacing size={8} /><Paragraph.Text typography=\"st13\" color=\"tertiary\">{`초기 투자금 10,000,000원 · ${result.startDate} ~ ${result.endDate}`}</Paragraph.Text><Spacing size={16} /><Sparkline points={result.monthlyEquity} /><Spacing size={16} /><Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"연평균 수익률(CAGR)\" bottom={`${result.cagrPct}%`} />} /></Card><Spacing size={16} /><AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /><Spacing size={24} /><Paragraph.Text typography=\"t4\">상세 리포트</Paragraph.Text><Spacing size={12} /><TossRewardAd slotId={import.meta.env.VITE_TOSS_AD_SLOT_ID}><Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"최대 낙폭(MDD)\" bottom={`${result.mddPct}%`} />} /><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"샤프지수\" bottom={`${result.sharpe}`} />} /><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"연환산 변동성\" bottom={`${result.volatilityPct}%`} />} /></Card><Spacing size={16} /><MiniBar data={result.yearly.map(y => ({label:`${y.year}`, value:y.returnPct}))} /></TossRewardAd><Spacing size={16} /><Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text></>} <Toast open={toastOpen} position=\"bottom\" onClose={closeToast} /> </ScreenScaffold>.\nStates: Loading=SummaryHero/Card Skeleton; Empty/Error=state 유실 시 EmptyState + '백테스트 다시 하기'; Locked=잠금 안내 + 리워드 시청 버튼.\nInteractions: 광고 완료 haptic success → 상세 노출 + unlockReport(presetId); 뒤로가기 → /backtest."
+  },
+  {
+    "id": "0016",
+    "title": "투자성향 퀴즈 화면 (S7)",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "8문항 4지선다 투자성향 진단을 한 문항씩 진행하는 화면을 구현한다. 진행률 표시, 선택 즉시 다음 문항 이동, 이전 문항 복귀, 마지막 문항 응답 시 채점 후 결과 화면 이동을 지원한다. 진단은 룰 기반이며 생성형 AI를 사용하지 않는다.",
+      "acceptance_criteria": [
+        "현재 문항이 '3 / 8' 형태로 표시되고 문항 이동에 따라 갱신된다",
+        "선택지 4개가 각각 44px 이상 높이로 렌더되고 선택 시 haptic tickWeak 후 자동으로 다음 문항으로 넘어간다",
+        "'이전 문항'으로 돌아가면 직전 선택이 Chip '선택'으로 유지 표시된다",
+        "8번째 응답 시 scoreQuiz(answers)로 채점해 mta:quiz에 저장하고 navigate('/quiz/result', { state: { score, type } })로 이동한다",
+        "1번 문항에서 '이전 문항' 시 /(홈)으로 이동하며 크래시하지 않는다"
+      ]
+    },
+    "covers": [
+      "F8-AC1",
+      "F8-AC2"
+    ],
+    "files": [
+      "src/pages/Quiz.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "생성형 AI 호출 0건",
+      "navigate state가 RouteState 타입과 일치",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0008"
+    ],
+    "db_schema": "쓰기: mta:quiz(QuizResult{answers[8], score, type, recommendedSymbols[3], answeredAt})",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: FormFlow(D) 스텝 진행형. TDS: Top(뒤로가기), Paragraph, Spacing, Card, ListRow, Chip, Button / 템플릿: ScreenScaffold, SubmitFooter.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>투자성향 진단</Top.TitleParagraph>} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">{`${step+1} / 8`}</Paragraph.Text> <Spacing size={8} /> <Paragraph.Text typography=\"t3\">{question.text}</Paragraph.Text> <Spacing size={20} /> {question.options.map((opt, i) => <Card key={i}><ListRow onClick={() => choose(i)} contents={<ListRow.Texts type=\"1RowTypeA\" top={opt.label} />} right={answers[step]===i ? <Chip label=\"선택\" variant=\"filled\" /> : undefined} /></Card>)} <Spacing size={24} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <SubmitFooter><Button variant=\"weak\" display=\"block\" onClick={goPrev}>이전 문항</Button></SubmitFooter> </ScreenScaffold> (각 ListRow 높이 ≥ 56px).\nStates: 진행 중=선택지에 Chip '선택'; Error=문항 로드 실패 시 '문항을 불러오지 못했어요' + '다시 시도' weak Button.\nInteractions: 선택지 탭 haptic tickWeak → 다음 문항 자동 이동; 마지막 문항 haptic success → 채점 후 navigate('/quiz/result', {state:{score, type}}); step===0에서 이전 → navigate('/')."
+  },
+  {
+    "id": "0017",
+    "title": "퀴즈 결과 화면 (S8)",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "진단 점수와 투자성향 유형(5단계), 유형 설명, 추천 종목 3개를 보여주는 결과 화면을 구현한다. 추천 종목 탭 시 주문 화면으로 이동하고, 다시 진단하기 버튼과 하단 배너 광고, 모의투자 고지 문구를 제공한다. location.state가 없으면 저장된 mta:quiz로 복구한다.",
+      "acceptance_criteria": [
+        "점수(8~32)와 유형 라벨(안정형/안정추구형/위험중립형/적극투자형/공격투자형)이 표시되고 유형별 설명 문구가 서로 다르게 노출된다",
+        "추천 종목이 정확히 3개 렌더되고 각 행에 종목명·코드·현재가가 표시되며 탭 시 /trade/:symbol로 이동한다",
+        "location.state가 없어도 mta:quiz로 복구해 렌더하고, 저장 결과도 없으면 '진단을 먼저 해주세요' + '진단 시작하기' 버튼을 표시한다",
+        "'다시 진단하기' 탭 시 /quiz로 이동해 1번 문항부터 시작한다",
+        "하단 AdSlot 배너와 모의투자 고지 문구가 콘텐츠와 겹치지 않게 노출된다"
+      ]
+    },
+    "covers": [
+      "F8-AC3"
+    ],
+    "files": [
+      "src/pages/QuizResult.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "생성형 AI 미사용이므로 AI 라벨 미표시",
+      "HEX 하드코딩 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0002",
+      "0008"
+    ],
+    "db_schema": "읽기: mta:quiz + INSTRUMENT_MAP으로 추천 종목명/현재가 조회",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "Pattern: ResultReport(A+E). TDS: Top, Card, ListRow, Badge, Chip, Paragraph, Spacing, Button / 템플릿: ScreenScaffold, SummaryHero, EmptyState, Asset.ContentIcon, AdSlot, SubmitFooter.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>진단 결과</Top.TitleParagraph>} /> {!result ? <EmptyState title=\"진단을 먼저 해주세요\" description=\"8개 문항이면 1분이면 끝나요\" action={<Button variant=\"weak\" display=\"block\" onClick={goQuiz}>진단 시작하기</Button>} /> : <><SummaryHero label=\"나의 투자성향\" value={<Paragraph.Text typography=\"t2\">{typeLabel}</Paragraph.Text>} caption={<Badge>{`${result.score}점`}</Badge>} /><Spacing size={16} /><Card><ListRow contents={<ListRow.Texts type=\"2RowTypeA\" top=\"성향 설명\" bottom={typeDescription} />} /></Card><Spacing size={24} /><Paragraph.Text typography=\"t4\">추천 종목</Paragraph.Text><Spacing size={12} />{result.recommendedSymbols.map(s => <Card key={s}><ListRow onClick={() => goTrade(s)} contents={<ListRow.Texts type=\"2RowTypeA\" top={nameOf(s)} bottom={`${s} · ${closeOf(s).toLocaleString('ko-KR')}원`} />} right={<Chip label=\"주문하기\" variant=\"outlined\" />} /></Card>)}<Spacing size={16} /><AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /><Spacing size={16} /><Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text><SubmitFooter><Button variant=\"weak\" display=\"block\" onClick={goQuiz}>다시 진단하기</Button></SubmitFooter></>} </ScreenScaffold>.\nStates: Loading=SummaryHero/Card Skeleton; Empty=결과 없음 EmptyState + '진단 시작하기'.\nInteractions: 추천 종목 탭 haptic tickWeak → navigate(`/trade/${symbol}`, {state:{symbol, from:'market'}}); '다시 진단하기' → navigate('/quiz')."
+  },
+  {
+    "id": "0018",
+    "title": "랭킹 화면 (S9)",
+    "epic": "Epic 3. UI 페이지",
+    "task": {
+      "description": "봇 49명 시드와 내 자산을 합쳐 총 50명 랭킹을 수익률 순으로 보여주는 화면을 구현한다. 전체/친구 탭 전환, 내 순위 강조 표시, 상위 3명 강조, 토스 로그인 연동 여부 확인, 하단 배너 광고와 모의투자 고지를 제공한다.",
+      "acceptance_criteria": [
+        "전체 탭에서 50명(봇 49 + 나)이 총 평가자산 내림차순으로 렌더되고 각 행에 순위·닉네임·수익률·연속출석일이 표시된다",
+        "내 행은 isMe 하이라이트(Chip '나')로 구분되고 화면 상단에 '내 순위 N위 / 50명'이 표시된다",
+        "'친구' 탭 선택 시 isFriend true인 항목과 내 항목만 필터되어 보이고, 친구가 0명이면 EmptyState가 표시된다",
+        "getIsTossLoginIntegratedService()로 연동 여부를 확인해 비연동 시에도 크래시 없이 닉네임을 '나'로 표기해 렌더한다",
+        "같은 자산 상태에서 재진입해도 봇 순위와 수치가 동일하다(mta:leaderboardSeed 재사용)"
+      ]
+    },
+    "covers": [
+      "F8-AC4",
+      "F8-AC5"
+    ],
+    "files": [
+      "src/pages/Leaderboard.tsx"
+    ],
+    "definition_of_done": [
+      "TDS 외 UI 라이브러리 0건",
+      "HEX 하드코딩 0건",
+      "커스텀 로그인 호출 0건",
+      "tsc --noEmit 통과"
+    ],
+    "depends_on": [
+      "0006",
+      "0008"
+    ],
+    "db_schema": "읽기: mta:leaderboardSeed(LeaderboardEntry[49]), mta:account, mta:positions, mta:streak — 'me' 항목은 매 렌더 계산",
+    "api_contract": "",
+    "dependencies": [
+      "@apps-in-toss/web-framework"
+    ],
+    "ui_requirements": "Pattern: PageShell(B+C). TDS: Top, Tab, Card, ListRow, Badge, Chip, Paragraph, Spacing, Button / 템플릿: ScreenScaffold, SummaryHero, EmptyState, Asset.ContentIcon, AdSlot, FloatingTabBar.\nLayout: <ScreenScaffold> <Top title={<Top.TitleParagraph>랭킹</Top.TitleParagraph>} /> <SummaryHero label=\"내 순위\" value={<Paragraph.Text typography=\"t2\">{`${myRank}위`}</Paragraph.Text>} caption={<Badge>{`총 ${total}명 중`}</Badge>} /> <Spacing size={16} /> <Tab onChange={setTabIndex}><Tab.Item selected={tabIndex===0}>전체</Tab.Item><Tab.Item selected={tabIndex===1}>친구</Tab.Item></Tab> <Spacing size={12} /> {rows.length===0 ? <div data-testid=\"leaderboard-empty\"><EmptyState title=\"표시할 랭킹이 없어요\" description=\"친구와 함께 모의투자를 시작해 보세요\" /></div> : rows.map((r, i) => <Card key={r.id}><ListRow left={<Chip label={`${i+1}`} variant={i<3?'filled':'outlined'} />} contents={<ListRow.Texts type=\"2RowTypeA\" top={r.isMe ? `${r.nickname} (나)` : r.nickname} bottom={`${r.totalAssetKrw.toLocaleString('ko-KR')}원 · ${r.streak}일 연속`} />} right={<Badge>{r.returnPct>=0?`+${r.returnPct}%`:`${r.returnPct}%`}</Badge>} /></Card>)} <Spacing size={16} /> <AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /> <Spacing size={16} /> <Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text> <FloatingTabBar /> </ScreenScaffold>.\nStates: Loading=Card Skeleton 8줄; Empty=leaderboard-empty EmptyState; Error=안내 + '다시 시도' weak Button.\nInteractions: 탭 전환 haptic tickWeak; 내 행은 Chip '나' + Badge 강조; 로그인 연동 확인은 getIsTossLoginIntegratedService()만 사용(커스텀 로그인 금지)."
+  },
+  {
+    "id": "0019",
+    "title": "라우팅 배선 + 전역 Provider + 탭바 노출 제어",
+    "epic": "4",
+    "task": {
+      "description": "App.tsx에서 react-router-dom 라우트 9개를 연결하고 AppStateProvider로 전체를 감싼다. FloatingTabBar는 메인 탭 경로(홈/마켓/포트폴리오/랭킹)에서만 노출되도록 제어하고, 정의되지 않은 경로는 홈으로 리다이렉트한다. main.tsx는 수정하지 않는다.",
+      "acceptance_criteria": [
+        "'/', '/market', '/trade/:symbol', '/portfolio', '/backtest', '/backtest/result', '/quiz', '/quiz/result', '/leaderboard' 9개 라우트가 모두 렌더되고 직접 URL 진입 시에도 크래시하지 않는다",
+        "전체 라우트가 AppStateProvider로 감싸져 어느 경로에서 새로고침해도 useAppState가 정상 동작한다",
+        "FloatingTabBar가 홈/마켓/포트폴리오/랭킹에서만 보이고 /trade/:symbol, /quiz, /quiz/result, /backtest/result에서는 보이지 않는다",
+        "존재하지 않는 경로(/foo) 진입 시 홈으로 리다이렉트된다",
+        "src/main.tsx 파일에 변경 사항이 0줄이고(git diff 확인) npm run build가 성공한다"
+      ]
+    },
+    "covers": [
+      "전역 라우팅",
+      "F2-AC2"
+    ],
+    "files": [
+      "src/App.tsx"
+    ],
+    "definition_of_done": [
+      "App.tsx를 수정하는 패킷은 전체에서 이 패킷 1개",
+      "main.tsx 미수정(@AI:ANCHOR)",
+      "tsc --noEmit 통과",
+      "각 라우트 수동 진입 확인"
+    ],
+    "depends_on": [
+      "0009",
+      "0010",
+      "0011",
+      "0012",
+      "0013",
+      "0014",
+      "0015",
+      "0016",
+      "0017",
+      "0018"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [
+      "react-router-dom"
+    ],
+    "ui_requirements": "App.tsx 구조: <AppStateProvider><BrowserRouter><Routes> 9개 Route (Home '/', Market '/market', Trade '/trade/:symbol', Portfolio '/portfolio', Backtest '/backtest', BacktestResult '/backtest/result', Quiz '/quiz', QuizResult '/quiz/result', Leaderboard '/leaderboard', 그리고 '*' → <Navigate to=\"/\" replace />) </Routes></BrowserRouter></AppStateProvider>. FloatingTabBar는 각 페이지가 이미 렌더하므로 App에서는 중복 렌더하지 않고, 노출 대상 경로 목록(MAIN_TAB_PATHS = ['/', '/market', '/portfolio', '/leaderboard'])만 공용 상수로 export해 페이지가 참조하게 한다. 새 UI 요소 추가 금지 — 라우팅/Provider 배선만."
+  },
+  {
+    "id": "0020",
+    "title": "광고 배치·로딩 스켈레톤·고지 컴포넌트 폴리시",
+    "epic": "Epic 4. 통합",
+    "task": {
+      "description": "화면 전반에서 재사용할 공용 UI 조각(모의투자 고지 문구, 광고 섹션 래퍼, 로딩 스켈레톤 세트)을 컴포넌트 파일로 정리해 배치 계약을 일관되게 만든다. App.tsx/main.tsx는 건드리지 않고 컴포넌트 파일만 생성하며, 심사 컴플라이언스 문구와 접근성 규격을 고정한다.",
+      "acceptance_criteria": [
+        "DisclaimerNotice가 '본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.'를 Paragraph.Text typography='st13' color='tertiary'로 렌더한다",
+        "AdSection이 상하 Spacing size={16}과 함께 AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID}를 감싸며, 콘텐츠 섹션 사이 또는 하단에만 쓰이도록 주석 계약이 명시된다",
+        "ListSkeleton/HeroSkeleton이 TDS Skeleton만 사용해 렌더되고 고정 px width 없이 100% 폭에 반응한다",
+        "세 컴포넌트 모두 HEX 색상 0건, Tailwind 여백 클래스 0건이며 커스텀 style은 flex/grid 배치에만 쓰인다",
+        "src/App.tsx와 src/main.tsx가 이 패킷에서 수정되지 않고(git diff 0줄) npm run build가 성공한다"
+      ]
+    },
+    "covers": [
+      "CP-5",
+      "CP-6",
+      "CP-8"
+    ],
+    "files": [
+      "src/components/DisclaimerNotice.tsx",
+      "src/components/AdSection.tsx",
+      "src/components/LoadingSkeletons.tsx"
+    ],
+    "definition_of_done": [
+      "App.tsx/main.tsx 미수정",
+      "TDS 외 UI 라이브러리 0건",
+      "외부 앱 설치 유도 문구/링크 0건",
+      "tsc --noEmit 통과, vite build 성공"
+    ],
+    "depends_on": [
+      "0001"
+    ],
+    "db_schema": "",
+    "api_contract": "",
+    "dependencies": [],
+    "ui_requirements": "TDS: Paragraph, Spacing, Skeleton / 템플릿: AdSlot.\nDisclaimerNotice: <><Spacing size={16} /><Paragraph.Text typography=\"st13\" color=\"tertiary\">본 서비스는 가상자금 기반 모의투자이며, 실제 투자 성과를 보장하지 않습니다.</Paragraph.Text></>.\nAdSection: <><Spacing size={16} /><AdSlot adGroupId={import.meta.env.VITE_TOSS_AD_GROUP_ID} /><Spacing size={16} /></> — 콘텐츠 사이/하단 전용, 결과 콘텐츠 위 겹침 금지.\nLoadingSkeletons: HeroSkeleton(높이 있는 Skeleton 1개 + Spacing 12 + 폭 60% Skeleton), ListSkeleton({count=5})은 Skeleton 행을 count만큼 반복하고 각 행 사이 Spacing size={8}. 고정 px width 금지(100% 사용), 터치 요소 없음. 보이스톤 해요체 유지."
+  }
+]
