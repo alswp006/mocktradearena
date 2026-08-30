@@ -292,3 +292,84 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0008: 퀴즈 채점 규칙 + 리더보드 시드 생성 (files: src/lib/quiz.ts, src/lib/leaderboard.ts)
 - 0009: 홈 화면 (S1) — 히어로·스트릭·메뉴 카드·고지 (files: src/pages/Home.tsx)
 - 0010: 마켓 화면 (S2) — 목록·탭 필터·검색 (files: src/pages/Market.tsx)
+
+## Available exports from existing files
+// src/App.tsx
+export { MAIN_TAB_PATHS, MAIN_TAB_ITEMS, isMainTabPath } from '@/lib/navigation';
+export function useRoute(): { current: RouteState; navigate: (screen: string, preview?: any) => void } {
+export default function App() {
+
+// src/components/AdSection.tsx
+export function AdSection() {
+
+// src/components/AdSlot.tsx
+export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
+
+// src/components/Amount.tsx
+export function Amount({
+
+// src/components/BottomCTA.tsx
+export function SubmitFooter({
+export function ButtonStack({
+
+// src/components/Card.tsx
+export function Card({
+
+// src/components/CountUp.tsx
+export function CountUp({
+
+// src/components/DisclaimerNotice.tsx
+export function DisclaimerNotice() {
+
+// src/components/FloatingTabBar.tsx
+export type TabItem = {
+export function FloatingTabBar({ items }: { items: TabItem[] }) {
+
+// src/components/LoadingSkeletons.tsx
+export function HeroSkeleton() {
+export function ListSkeleton({ rows, count = 5 }: { rows?: number; count?: number }) {
+
+// src/components/MiniBar.tsx
+export function MiniBar({
+
+// src/components/PageShell.tsx
+export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+
+// src/components/ScreenScaffold.tsx
+export function ScreenScaffold({
+
+// src/components/Sparkline.tsx
+export function Sparkline({
+
+// src/components/StateView.tsx
+export function EmptyState({
+export function LoadingState({
+
+// src/components/SummaryHero.tsx
+export function SummaryHero({
+
+// src/components/TossPurchase.tsx
+export interface TossPurchaseResult {
+export function TossPurchase({
+
+// src/components/TossRewardAd.tsx
+export function TossRewardAd({
+
+// src/data/instruments.ts
+export const INSTRUMENTS: Instrument[] = [
+export const INSTRUMENT_MAP: Record<string, Instrument> = Object.fromEntries(
+export function getInstrument(symbol: string): Instrument | undefined {
+
+// src/lib/backtest.ts
+export type BacktestCalcResult = BacktestResult | { ok: false; reason: string
+
+## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
+
+Available topics: deploy(1), general(9)
+
+Key lessons (verify against actual code before applying):
+- [general] 외부에서 들어온 모든 값(라우터 state, 로컬 저장소, 부분 입력 폼)은 사용 직전에 배열·객체 기본값으로 정규화하고, 테이블/맵 조회 결과는 존재 확인 후에만 하위 속성이나 length에 접근하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
+- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
