@@ -319,6 +319,11 @@ export function mockTossRewardAd() {
 
 // ── react-router-dom ──
 // Preserve actual router + override useNavigate for assertion.
+// useLocation is intentionally left as the real implementation (not
+// stubbed to the static `mockLocation`) — every test using this helper
+// wraps the tree in a real MemoryRouter, so components that read
+// location.state (e.g. incoming RouteState) get the actual value that
+// MemoryRouter's initialEntries set, not a frozen default.
 export function mockRouter() {
   vi.mock("react-router-dom", async () => {
     const actual = await vi.importActual<typeof import("react-router-dom")>(
@@ -327,7 +332,6 @@ export function mockRouter() {
     return {
       ...actual,
       useNavigate: () => mockNavigate,
-      useLocation: () => mockLocation,
     };
   });
 }

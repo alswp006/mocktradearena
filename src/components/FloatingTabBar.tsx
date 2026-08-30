@@ -45,8 +45,7 @@ export function FloatingTabBar({ items }: { items: TabItem[] }) {
           <button
             key={item.path}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-current={active ? "page" : undefined}
             aria-label={item.label}
             onClick={() => {
               if (active) return;
