@@ -1,0 +1,127 @@
+# Shared Context (auto-generated — do NOT modify)
+
+
+## 패킷 간 계약 (src/lib/contract.ts — 자동 생성, 수정 금지)
+여기 선언된 이름·인자·반환 타입은 확정이다. 기반 패킷은 이대로 구현하고,
+화면 패킷은 이대로 호출하라. 다르게 만들지 마라.
+
+```typescript
+/**
+ * 패킷 간 인터페이스 계약 — 자동 생성. **수정하지 마라.**
+ *
+ * 기반 패킷은 여기 선언된 모양 그대로 구현하고, 화면 패킷은 여기 적힌 이름·인자·반환
+ * 타입을 그대로 가정해도 된다. 추측이 어긋나 병합에서 무너지는 것을 막기 위한 파일이다.
+ */
+
+/** 종목 마스터 타입, 모든 거래·백테스트에서 사용 (구현: 패킷 0001) */
+export type Instrument = { id: string; name: string; category: "stock"|"etf"|"fund"; basePriceCents: number };
+
+/** 보유 종목 항목, Portfolio 구성 (구현: 패킷 0001) */
+export type Position = { instrumentId: string; quantity: number; avgBuyPrice: number; currentPrice: number; unrealizedGainKrw: number };
+
+/** 포트폴리오 전체, AppState의 핵심 (구현: 패킷 0001) */
+export type Portfolio = { totalAssetKrw: number; totalGainKrw: number; positions: Position[]; lastUpdatedAt: string };
+
+/** 체결 거래 기록, 거래내역·백테스트에서 사용 (구현: 패킷 0001) */
+export type Trade = { id: string; instrumentId: string; type: "buy"|"sell"; quantity: number; pricePerUnit: number; executedAt: string; totalKrw: number };
+
+/** 앱 전역 상태 스키마, 0006 Provider가 관리 (구현: 패킷 0001) */
+export type AppState = { userId: string; portfolio: Portfolio; wallet: { balanceKrw: number }; lastCheckinDate: string; streakDays: number };
+
+/** 라우팅 상태, 0019가 관리 (구현: 패킷 0001) */
+export type RouteState = { currentScreen: "home"|"market"|"trade"|"portfolio"|"backtest"|"quiz"|"quizResult"|"leaderboard"; tradePreview?: { instrumentId: string; quantity: number; type: "buy"|"sell" } };
+
+/** 퀴즈 제출 결과, 0008·0017에서 사용 (구현: 패킷 0001) */
+export type QuizResult = { userId: string; answersJson: string; score: number; profile: "conservative"|"moderate"|"aggressive"; submittedAt: string };
+
+/** 랭킹 항목, 0018에서 표시 (구현: 패킷 0001) */
+export type LeaderboardEntry = { rank: number; userId: string; score: number; questionsCorrect: number };
+
+/** 종목의 지정 날짜 가격 조회, 0005·0011에서 호출 (구현: 패킷 0003) */
+export type getPriceForInstrumentFn = (instrumentId: string, dateStr: string) => number;
+
+/** 현재 KST 시각 ISO 문자열, 모든 시간 처리 (구현: 패킷 0002) */
+export type getKSTDateFn = () => string;
+
+/** KST 문자열을 Date로 파싱 (구현: 패킷 0002) */
+export type parseKSTDateFn = (dateStr: string) => Date;
+
+/** KST 날짜에 days 더한 ISO 문자열 반환 (구현: 패킷 0002) */
+export type addDaysKSTFn = (dateStr: string, days: number) => string;
+
+/** localStorage 안전 조회 (파싱 복구, Quota 처리) (구현: 패킷 0004) */
+export type getStorageItemFn = <T>(key: string, defaultValue: T) => T;
+
+/** localStorage 안전 저장 (QuotaExceededError 처리) (구현: 패킷 0004) */
+export type setStorageItemFn = (key: string, value: any) => boolean;
+
+/** 일일 체크인 실행, 스트릭·보상 계산 (구현: 패킷 0005) */
+export type executeCheckinFn = (userId: string, currentPortfolio: Portfolio) => { streakDays: number; dailyRewardKrw: number; isFirstCheckingToday: boolean };
+
+/** 거래 체결, Portfolio·Trade 생성 (구현: 패킷 0005) */
+export type executeTradeFn = (userId: string, walletBalance: number, trade: { instrumentId: string; quantity: number; type: "buy"|"sell"; pricePerUnit: number }) => { success: boolean; newWalletBalance: number; trade?: Trade; error?: string };
+
+/** 시계열 수익률로부터 백테스트 지표 계산 (구현: 패킷 0007) */
+export type calculateBacktestMetricsFn = (returns: number[]) => { cagr: number; maxDrawdown: number; sh
+```
+
+## Shared Types Contract (IMPORT these, do NOT redefine)
+```typescript
+// Domain types — add your app-specific types here
+export {};
+
+```
+
+## Existing Codebase (import and use these — do NOT recreate)
+### File Tree (src/)
+  App.tsx
+  components/
+    AdSlot.tsx
+    Amount.tsx
+    BottomCTA.tsx
+    Card.tsx
+    CountUp.tsx
+    FloatingTabBar.tsx
+    MiniBar.tsx
+    PageShell.tsx
+    ScreenScaffold.tsx
+    Sparkline.tsx
+    StateView.tsx
+    SummaryHero.tsx
+    TossPurchase.tsx
+    TossRewardAd.tsx
+  hooks/
+  lib/
+    storage.ts
+    types.ts
+    utils.ts
+  main.tsx
+  pages/
+    Home.tsx
+    __TdsGallery.tsx
+  styles/
+    globals.css
+    reward-ad.css
+  types/
+  vite-env.d.ts
+
+### Exports (src/lib/)
+- storage.ts: export function getItem<T>(key: string): T | null; export function setItem<T>(key: string, value: T): void; export function removeItem(key: string): void
+- utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string
+
+### Components (src/components/)
+- AdSlot.tsx: AdSlot
+- Amount.tsx: Amount
+- BottomCTA.tsx: SubmitFooter, ButtonStack
+- Card.tsx: Card
+- CountUp.tsx: CountUp
+- FloatingTabBar.tsx: FloatingTabBar
+- MiniBar.tsx: MiniBar
+- PageShell.tsx: PageShell
+- ScreenScaffold.tsx: ScreenScaffold
+- Sparkline.tsx: Sparkline
+- StateView.tsx: EmptyState, LoadingState
+- SummaryHero.tsx: SummaryHero
+- TossPurchase.tsx: TossPurchase
+- TossRewardAd.tsx: TossRewardAd
+CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
