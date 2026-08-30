@@ -6,10 +6,9 @@ import { SummaryHero } from '../components/SummaryHero';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/StateView';
 import { ButtonStack } from '../components/BottomCTA';
-import { loadQuiz } from '../lib/storage';
-import { RECOMMENDED_SYMBOLS, RISK_DESCRIPTION, RISK_LABEL } from '../lib/quiz';
+import { recommendedSymbols, RISK_DESCRIPTION, RISK_LABEL, loadQuizRecord } from '../lib/quiz';
 import { getInstrument } from '../data/instruments';
-import type { RiskType } from '../lib/types';
+import type { RiskType } from '../lib/quiz';
 
 type IncomingState = { score?: number; type?: RiskType } | null;
 
@@ -21,8 +20,8 @@ export default function QuizResult() {
   // 라우터 state가 없으면(직접 진입·새로고침) 저장된 응시 결과로 복원한다.
   const resolved = useMemo(() => {
     if (state?.type) return { type: state.type, score: state.score ?? 0 };
-    const stored = loadQuiz();
-    return stored ? { type: stored.riskProfile, score: stored.score } : null;
+    const stored = loadQuizRecord();
+    return stored ? { type: stored.type, score: stored.score } : null;
   }, [state?.type, state?.score]);
 
   if (!resolved) {
@@ -42,7 +41,7 @@ export default function QuizResult() {
     );
   }
 
-  const recommended = RECOMMENDED_SYMBOLS[resolved.type]
+  const recommended = recommendedSymbols(resolved.type)
     .map((symbol) => getInstrument(symbol))
     .filter((it): it is NonNullable<typeof it> => it !== undefined);
 

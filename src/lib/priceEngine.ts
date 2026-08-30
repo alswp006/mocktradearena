@@ -7,7 +7,7 @@ import { getInstrument } from "@/data/instruments";
 import { toDayIndex, todayKst, endOfMonth } from "@/lib/date";
 
 // 문자열 → 32bit 정수 해시 (FNV-1a)
-function hash32(str: string): number {
+export function hash32(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -17,7 +17,7 @@ function hash32(str: string): number {
 }
 
 // mulberry32 — 32bit 시드 기반 결정적 PRNG, [0,1) 균등분포 반환 함수 생성
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return function () {
     a = (a + 0x6d2b79f5) | 0;

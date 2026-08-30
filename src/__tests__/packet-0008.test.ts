@@ -336,9 +336,9 @@ describe("퀴즈 채점 규칙 + 리더보드 시드 생성 (packet-0008)", () =
     });
 
     it("should handle mixed answers", () => {
-      const mixedAnswers = [0, 1, 2, 3, 0, 2, 1, 3]; // 12 points
+      const mixedAnswers = [0, 1, 2, 3, 0, 2, 1, 3]; // weights: 0+1+1+3+0+1+1+3 = 10, score = 8+10 = 18
       const result = scoreQuiz(mixedAnswers);
-      expect(result.score).toBe(12);
+      expect(result.score).toBe(18);
       expect(result.type).toBeTruthy();
     });
 
