@@ -1,33 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { bootstrap, performDailyCheckin } from "@/lib/checkin";
+import { executeTrade } from "@/lib/tradeEngine";
+import { todayKst as libTodayKst, addDaysKST } from "@/lib/date";
 
 // ============================================================================
 // NOTICE: Tests are written BEFORE implementation.
 // These tests describe the expected behavior for checkin.ts & tradeEngine.ts
-// The implementation will be provided by the Coder.
+// The implementation is provided by src/lib/checkin.ts & src/lib/tradeEngine.ts
+// (imported above) — the placeholder stubs at the bottom of this file are
+// unused dead code kept only for signature documentation.
 // ============================================================================
 
 describe("Packet 0005: Bootstrap · Daily Grant · Streak + Trade Engine", () => {
   // Helper: Generate today's date in KST format (YYYY-MM-DD)
-  const todayKst = (): string => {
-    const now = new Date();
-    const kst = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 9 * 3600000);
-    return kst.toISOString().split("T")[0];
-  };
+  // Delegates to the real @/lib/date util — a manual UTC-offset trick here would
+  // give the wrong date whenever the test runner's own local TZ happens to be KST
+  // (the offset math cancels out to zero shift instead of the intended +9h).
+  const todayKst = (): string => libTodayKst();
 
   // Helper: Get yesterday's date in KST
-  const yesterdayKst = (): string => {
-    const now = new Date();
-    const kst = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 9 * 3600000);
-    const yesterday = new Date(kst.getTime() - 24 * 3600000);
-    return yesterday.toISOString().split("T")[0];
-  };
+  const yesterdayKst = (): string => addDaysKST(libTodayKst(), -1);
 
   // Helper: Get a date N days ago in KST
   const nDaysAgoKst = (n: number): string => {
-    const now = new Date();
-    const kst = new Date(now.getTime() + now.getTimezoneOffset() * 60000 + 9 * 3600000);
-    const past = new Date(kst.getTime() - n * 24 * 3600000);
-    return past.toISOString().split("T")[0];
+    return addDaysKST(libTodayKst(), -n);
   };
 
   // ========================================================================
@@ -453,30 +449,7 @@ describe("Packet 0005: Bootstrap · Daily Grant · Streak + Trade Engine", () =>
 });
 
 // ============================================================================
-// PLACEHOLDER SIGNATURES (Coder will implement these)
+// bootstrap / performDailyCheckin / executeTrade are implemented in
+// src/lib/checkin.ts & src/lib/tradeEngine.ts and imported at the top of
+// this file — see AC-1..AC-5 above for the behavior contract they satisfy.
 // ============================================================================
-
-/**
- * Initializes app state on first launch.
- * Creates default account (1M cash) and meta (schema v1) if missing.
- */
-function bootstrap(storage: Map<string, any>): { account: any; meta: any } {
-  throw new Error("NOT IMPLEMENTED - Coder will implement in src/lib/checkin.ts");
-}
-
-/**
- * Performs daily check-in, granting cash and updating streak.
- * Returns { granted, grantAmount, bonusAmount, streak, isNewStreakMilestone }
- */
-function performDailyCheckin(account: any, streak: any): any {
-  throw new Error("NOT IMPLEMENTED - Coder will implement in src/lib/checkin.ts");
-}
-
-/**
- * Executes a trade (BUY/SELL), validating cash and quantity constraints.
- * Updates avgPrice as integer, appends to trades list.
- * Returns { ok: boolean, reason?: string, trade?: any }
- */
-function executeTrade(account: any, positions: Map<string, any>, tradeRequest: any, trades?: any[]): any {
-  throw new Error("NOT IMPLEMENTED - Coder will implement in src/lib/tradeEngine.ts");
-}
