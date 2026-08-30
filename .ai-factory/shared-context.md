@@ -143,34 +143,32 @@ export type BacktestYears = 1 | 3 | 5 | 10;
 export interface BacktestPreset {
   id: string;
   name: string;
-  description: string;
-  symbols: string[];
-  startCapital: number;
+  items: PresetItem[]; // 1~5개, weight 합계 === 100
   years: BacktestYears;
-  riskType: RiskType;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string; // ISO8601
 }
 
 // ── BacktestResult ────────────────────────────────────────────
 export interface YearlyReturn {
   year: number;
-  return: number;
+  returnPct: number;
 }
 
 export interface BacktestResult {
-  id: string;
   presetId: string;
   years: BacktestYears;
-  startCapital: number;
-  endCapital: number;
-  trades: Trade[];
-  returns: YearlyReturn[];
-  maxDrawdown: number;
-  sharpeRatio: number;
-  winRate: number;
-  riskType: RiskType;
-  createdAt: Date;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  initialAmount: 10000000; // 고정 1,000만원
+  finalAmount: number; // 원
+  totalReturnPct: number; // 소수 2자리
+  cagrPct: number; // 소수 2자리
+  mddPct: number; // 음수, 소수 2자리
+  sharpe: number; // 소수 2자리
+  volatilityPct: number; // 연환산 변동성, 소수 2자리
+  monthlyEquity: number[]; // 월말 평가금액 시계열 (years*12+1 개)
+  yearly: YearlyReturn[];
+  computedAt: string; // ISO8601
 }
 
 // ── QuizResult ────────────────────────────────────────────────
@@ -188,15 +186,7 @@ export interface LeaderboardEntry {
   rank: number;
   userId: string;
   userName: string;
-  score: number;
-  backtestCount: number;
-  bestReturn: number;
-  createdAt: Date;
-}
-
-// ── AppMeta ───────────────────────────────────────────────────
-export interface AppMeta {
-  vers
+  score: numbe
 // ...truncated
 ```
 
@@ -222,6 +212,7 @@ export interface AppMeta {
     instruments.ts
   hooks/
   lib/
+    backtest.ts
     contract.ts
     date.ts
     priceEngine.ts
@@ -239,6 +230,7 @@ export interface AppMeta {
   vite-env.d.ts
 
 ### Exports (src/lib/)
+- backtest.ts: export type BacktestCalcResult = BacktestResult |; export function runBacktest(preset: BacktestPreset): BacktestCalcResult
 - contract.ts: export type Instrument =; export type Position =; export type Portfolio =; export type Trade =; export type AppState =; export type RouteState =; export type QuizResult =; export type LeaderboardEntry =
 - date.ts: export function todayKst(): string; export function toDayIndex(dateStr: string): number; export function addYears(dateStr: string, years: number): string; export function endOfMonth(dateStr: string): string; export function getKSTDate(): string; export function parseKSTDate(dateStr: string): Date; export function addDaysKST(dateStr: string, days: number): string
 - priceEngine.ts: export function getClose(symbol: string, dateStr: string): number; export const getPriceForInstrument: (instrumentId: string, dateStr: string) => number = getClose; export function getDailySeries(symbol: string): PricePoint[]; export function getMonthlySeries(symbol: string): PricePoint[]
@@ -263,6 +255,7 @@ export interface AppMeta {
 - TossRewardAd.tsx: TossRewardAd
 
 ### Module Dependencies (import graph)
+  lib/backtest.ts → imports: lib/types, lib/priceEngine, lib/date
   lib/priceEngine.ts → imports: lib/types, data/instruments, lib/date
   lib/storage.ts → imports: lib/types
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.

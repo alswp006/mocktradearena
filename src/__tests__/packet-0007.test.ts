@@ -73,6 +73,15 @@ type BacktestCalcResult = BacktestResult | { ok: false; reason: string };
 // 함수 import는 구현 후 활성화 (현재 TDD red phase)
 // import { runBacktest } from "@/lib/backtest";
 
+// 사용자 정의 타입가드 — "ok" in result && !result.ok 형태의 복합 조건은
+// TS 제어흐름분석이 if문 이후 구간에서 정확히 좁히지 못하므로(음의 좁히기 한계),
+// 단일 타입 프레디킷으로 대체해 이후 코드에서 BacktestResult로 안전하게 좁힌다.
+function isFailure(
+  result: BacktestCalcResult,
+): result is { ok: false; reason: string } {
+  return "ok" in result;
+}
+
 describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)", () => {
   // ── AC1: monthlyEquity 길이, initialAmount, finalAmount 검증 ──
   describe("AC-1: 기본 출력 구조 (monthlyEquity 길이, initialAmount, finalAmount)", () => {
@@ -83,7 +92,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result).toHaveProperty("monthlyEquity");
@@ -98,7 +107,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.monthlyEquity).toHaveLength(expectedLength);
@@ -110,7 +119,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.initialAmount).toBe(10000000);
@@ -122,7 +131,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(Number.isInteger(result.finalAmount)).toBe(true);
@@ -135,7 +144,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.monthlyEquity[0]).toBe(result.initialAmount);
@@ -147,7 +156,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.monthlyEquity[result.monthlyEquity.length - 1]).toBe(
@@ -164,7 +173,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.totalReturnPct).toBeDefined();
@@ -180,7 +189,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.cagrPct).toBeDefined();
@@ -194,7 +203,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.mddPct).toBeLessThanOrEqual(0);
@@ -206,7 +215,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       const rounded = Math.round(result.mddPct * 100) / 100;
@@ -219,7 +228,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       const rounded = Math.round(result.sharpe * 100) / 100;
@@ -232,7 +241,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       const rounded = Math.round(result.volatilityPct * 100) / 100;
@@ -283,7 +292,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.yearly).toHaveLength(preset.years);
@@ -295,7 +304,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       expect(result.yearly).toHaveLength(preset.years);
@@ -307,7 +316,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       result.yearly.forEach((item, index) => {
@@ -325,7 +334,7 @@ describe("Packet 0007: 백테스트 계산 엔진 (시계열·CAGR·MDD·샤프)
 
       // Act
       const result: BacktestCalcResult = runBacktest(preset);
-      if ("ok" in result && !result.ok) throw new Error(result.reason);
+      if (isFailure(result)) throw new Error(result.reason);
 
       // Assert
       result.yearly.forEach((item) => {

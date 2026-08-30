@@ -192,8 +192,11 @@ describe("localStorage 안전 래퍼 (파싱 복구·Quota 처리)", () => {
         tradedAt: new Date(),
       }));
 
-      // Mock setItem to always throw QuotaExceededError
-      const quotaExceededMock = vi.spyOn(localStorage, "setItem");
+      // Mock setItem to always throw QuotaExceededError.
+      // jsdom's Storage instance is a legacy platform object with named-property
+      // interception, so spying on the instance (localStorage.setItem) silently
+      // no-ops — spy on Storage.prototype instead so the override actually takes effect.
+      const quotaExceededMock = vi.spyOn(Storage.prototype, "setItem");
       quotaExceededMock.mockImplementation(() => {
         const err = new Error("QuotaExceededError");
         err.name = "QuotaExceededError";
@@ -427,13 +430,12 @@ describe("localStorage 안전 래퍼 (파싱 복구·Quota 처리)", () => {
         {
           id: "preset-1",
           name: "공격적 포트폴리오",
-          description: "고성장 주식 중심",
-          symbols: ["005930", "000660"],
-          startCapital: 10000000,
+          items: [
+            { symbol: "005930", weight: 60 },
+            { symbol: "000660", weight: 40 },
+          ],
           years: 5,
-          riskType: "aggressive",
-          createdAt: new Date("2024-01-01"),
-          updatedAt: new Date("2024-01-01"),
+          createdAt: "2024-01-01T00:00:00+09:00",
         },
       ];
 
@@ -446,25 +448,27 @@ describe("localStorage 안전 래퍼 (파싱 복구·Quota 처리)", () => {
 
     it("saveLastBacktest should persist and loadLastBacktest should retrieve", () => {
       const result: BacktestResult = {
-        id: "result-1",
         presetId: "preset-1",
         years: 5,
-        startCapital: 10000000,
-        endCapital: 15000000,
-        trades: [],
-        returns: [],
-        maxDrawdown: -20.5,
-        sharpeRatio: 1.5,
-        winRate: 0.65,
-        riskType: "moderate",
-        createdAt: new Date(),
+        startDate: "2019-01-01",
+        endDate: "2024-01-01",
+        initialAmount: 10000000,
+        finalAmount: 15000000,
+        totalReturnPct: 50,
+        cagrPct: 8.45,
+        mddPct: -20.5,
+        sharpe: 1.5,
+        volatilityPct: 18.2,
+        monthlyEquity: [10000000, 15000000],
+        yearly: [],
+        computedAt: "2024-01-01T00:00:00+09:00",
       };
 
       saveLastBacktest(result);
       const loaded = loadLastBacktest();
 
       expect(loaded).not.toBeNull();
-      expect(loaded?.endCapital).toBe(15000000);
+      expect(loaded?.finalAmount).toBe(15000000);
     });
 
     it("saveQuiz should persist and loadQuiz should retrieve", () => {
@@ -528,13 +532,9 @@ describe("localStorage 안전 래퍼 (파싱 복구·Quota 처리)", () => {
       const presets: BacktestPreset[] = Array.from({ length: 15 }, (_, i) => ({
         id: `preset-${i}`,
         name: `Portfolio ${i}`,
-        description: `Description ${i}`,
-        symbols: ["005930"],
-        startCapital: 10000000,
+        items: [{ symbol: "005930", weight: 100 }],
         years: 5 as const,
-        riskType: "moderate" as const,
-        createdAt: new Date(Date.now() - (15 - i) * 86400000),
-        updatedAt: new Date(Date.now() - (15 - i) * 86400000),
+        createdAt: new Date(Date.now() - (15 - i) * 86400000).toISOString(),
       }));
 
       savePresets(presets);

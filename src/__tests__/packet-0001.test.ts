@@ -78,13 +78,9 @@ describe("Packet 0001: 엔티티 타입 + RouteState 계약 정의", () => {
       const preset: BacktestPreset = {
         id: "preset-1",
         name: "Test Preset",
-        description: "Test",
-        symbols: ["005930"],
-        startCapital: 1000000,
+        items: [{ symbol: "005930", weight: 100 }],
         years: 3,
-        riskType: "conservative",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date().toISOString(),
       };
 
       expect([1, 3, 5, 10]).toContain(preset.years);
@@ -93,18 +89,20 @@ describe("Packet 0001: 엔티티 타입 + RouteState 계약 정의", () => {
     it("should have BacktestResult.years field using BacktestYears type", () => {
       // Verify BacktestResult has years field with BacktestYears type
       const result: BacktestResult = {
-        id: "result-1",
         presetId: "preset-1",
         years: 5,
-        startCapital: 1000000,
-        endCapital: 1500000,
-        trades: [],
-        returns: [],
-        maxDrawdown: 0.15,
-        sharpeRatio: 1.2,
-        winRate: 0.55,
-        riskType: "moderate",
-        createdAt: new Date(),
+        startDate: "2019-01-01",
+        endDate: "2024-01-01",
+        initialAmount: 10000000,
+        finalAmount: 15000000,
+        totalReturnPct: 50,
+        cagrPct: 8.45,
+        mddPct: -15,
+        sharpe: 1.2,
+        volatilityPct: 20,
+        monthlyEquity: [10000000, 15000000],
+        yearly: [],
+        computedAt: new Date().toISOString(),
       };
 
       expect([1, 3, 5, 10]).toContain(result.years);
@@ -278,43 +276,43 @@ describe("Packet 0001: 엔티티 타입 + RouteState 계약 정의", () => {
       const preset: BacktestPreset = {
         id: "preset-1",
         name: "Conservative",
-        description: "Low risk strategy",
-        symbols: ["005930", "000660"],
-        startCapital: 1000000,
+        items: [
+          { symbol: "005930", weight: 50 },
+          { symbol: "000660", weight: 50 },
+        ],
         years: 3,
-        riskType: "conservative",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date().toISOString(),
       };
 
       expect(preset.years).toBe(3);
-      expect(preset.riskType).toBe("conservative");
-      expect(preset.symbols).toHaveLength(2);
+      expect(preset.items).toHaveLength(2);
     });
 
     it("should allow creating BacktestResult objects", () => {
       const result: BacktestResult = {
-        id: "result-1",
         presetId: "preset-1",
         years: 5,
-        startCapital: 1000000,
-        endCapital: 1500000,
-        trades: [],
-        returns: [
-          { year: 2020, return: 0.1 },
-          { year: 2021, return: 0.15 },
+        startDate: "2019-01-01",
+        endDate: "2024-01-01",
+        initialAmount: 10000000,
+        finalAmount: 15000000,
+        totalReturnPct: 50,
+        cagrPct: 8.45,
+        mddPct: -15,
+        sharpe: 1.2,
+        volatilityPct: 20,
+        monthlyEquity: [10000000, 15000000],
+        yearly: [
+          { year: 1, returnPct: 10 },
+          { year: 2, returnPct: 15 },
         ],
-        maxDrawdown: 0.15,
-        sharpeRatio: 1.2,
-        winRate: 0.55,
-        riskType: "moderate",
-        createdAt: new Date(),
+        computedAt: new Date().toISOString(),
       };
 
       expect(result.years).toBe(5);
-      expect(result.startCapital).toBe(1000000);
-      expect(result.endCapital).toBe(1500000);
-      expect(result.returns).toHaveLength(2);
+      expect(result.startDate).toBe("2019-01-01");
+      expect(result.finalAmount).toBe(15000000);
+      expect(result.yearly).toHaveLength(2);
     });
 
     it("should allow creating QuizResult objects", () => {

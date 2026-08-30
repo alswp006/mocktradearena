@@ -141,12 +141,8 @@ export function saveStreak(streak: StreakState, onQuotaExceeded?: QuotaExceededH
 
 // ── Presets ───────────────────────────────────────────────────
 
-function revivePreset(p: BacktestPreset): BacktestPreset {
-  return { ...p, createdAt: toDate(p.createdAt), updatedAt: toDate(p.updatedAt) };
-}
-
 export function loadPresets(): BacktestPreset[] {
-  return safeRead(STORAGE_KEYS.presets, [] as BacktestPreset[], (list) => list.map(revivePreset));
+  return safeRead(STORAGE_KEYS.presets, [] as BacktestPreset[]);
 }
 
 export function savePresets(presets: BacktestPreset[], onQuotaExceeded?: QuotaExceededHandler): void {
@@ -156,16 +152,8 @@ export function savePresets(presets: BacktestPreset[], onQuotaExceeded?: QuotaEx
 
 // ── Last backtest result ─────────────────────────────────────
 
-function reviveBacktestResult(r: BacktestResult): BacktestResult {
-  return { ...r, createdAt: toDate(r.createdAt), trades: (r.trades ?? []).map(reviveTrade) };
-}
-
 export function loadLastBacktest(): BacktestResult | null {
-  return safeRead(
-    STORAGE_KEYS.lastBacktest,
-    null as BacktestResult | null,
-    (r) => (r ? reviveBacktestResult(r) : r)
-  );
+  return safeRead(STORAGE_KEYS.lastBacktest, null as BacktestResult | null);
 }
 
 export function saveLastBacktest(
