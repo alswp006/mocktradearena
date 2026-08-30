@@ -102,6 +102,27 @@ export interface BacktestResult {
   computedAt: string; // ISO8601
 }
 
+// ── BacktestResultData (Packet 0015) ───────────────────────────────────
+export interface SeriesPoint {
+  date: string;
+  value: number;
+}
+
+export interface YearlyReturnData {
+  year: number;
+  ret: number;
+}
+
+export interface BacktestResultData {
+  series: SeriesPoint[];
+  totalReturn: number;
+  cagr: number;
+  mdd: number;
+  sharpe: number;
+  volatility: number;
+  yearlyReturns: YearlyReturnData[];
+}
+
 // ── QuizResult ────────────────────────────────────────────────
 export interface QuizResult {
   id: string;

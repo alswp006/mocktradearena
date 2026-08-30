@@ -13,56 +13,68 @@
  * 타입을 그대로 가정해도 된다. 추측이 어긋나 병합에서 무너지는 것을 막기 위한 파일이다.
  */
 
-/** 종목 마스터 타입, 모든 거래·백테스트에서 사용 (구현: 패킷 0001) */
-export type Instrument = { id: string; name: string; category: "stock"|"etf"|"fund"; basePriceCents: number };
+/** 전역 사용자 엔티티 (구현: 패킷 0001) */
+export type User = { id: string; name: string; knowledgePoints: number; streak: number; lastCheckinDate: string };
 
-/** 보유 종목 항목, Portfolio 구성 (구현: 패킷 0001) */
-export type Position = { instrumentId: string; quantity: number; avgBuyPrice: number; currentPrice: number; unrealizedGainKrw: number };
+/** 종목 엔티티 (구현: 패킷 0001) */
+export type Instrument = { code: string; name: string; sector: string; price: number };
 
-/** 포트폴리오 전체, AppState의 핵심 (구현: 패킷 0001) */
-export type Portfolio = { totalAssetKrw: number; totalGainKrw: number; positions: Position[]; lastUpdatedAt: string };
+/** 포트폴리오 엔티티 (구현: 패킷 0001) */
+export type Portfolio = { userId: string; holdings: { code: string; quantity: number; buyPrice: number }[]; cashKrw: number };
 
-/** 체결 거래 기록, 거래내역·백테스트에서 사용 (구현: 패킷 0001) */
-export type Trade = { id: string; instrumentId: string; type: "buy"|"sell"; quantity: number; pricePerUnit: number; executedAt: string; totalKrw: number };
+/** 거래 기록 엔티티 (구현: 패킷 0001) */
+export type Trade = { id: string; userId: string; code: string; side: 'BUY' | 'SELL'; quantity: number; price: number; executedAt: string };
 
-/** 앱 전역 상태 스키마, 0006 Provider가 관리 (구현: 패킷 0001) */
-export type AppState = { userId: string; portfolio: Portfolio; wallet: { balanceKrw: number }; lastCheckinDate: string; streakDays: number };
+/** 라우팅 상태 (구현: 패킷 0001) */
+export type RouteState = { pathname: string; params?: Record<string, string>; state?: Record<string, unknown> };
 
-/** 라우팅 상태, 0019가 관리 (구현: 패킷 0001) */
-export type RouteState = { currentScreen: "home"|"market"|"trade"|"portfolio"|"backtest"|"quiz"|"quizResult"|"leaderboard"; tradePreview?: { instrumentId: string; quantity: number; type: "buy"|"sell" } };
+/** 백테스트 결과 엔티티 (구현: 패킷 0001) */
+export type BacktestResult = { cagr: number; mdd: number; sharpe: number; annualReturns: Record<string, number>; yearlyVolatility: number };
 
-/** 퀴즈 제출 결과, 0008·0017에서 사용 (구현: 패킷 0001) */
-export type QuizResult = { userId: string; answersJson: string; score: number; profile: "conservative"|"moderate"|"aggressive"; submittedAt: string };
+/** 퀴즈 결과 엔티티 (구현: 패킷 0001) */
+export type QuizResult = { score: number; level: 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE'; nextQuizDate: string };
 
-/** 랭킹 항목, 0018에서 표시 (구현: 패킷 0001) */
-export type LeaderboardEntry = { rank: number; userId: string; score: number; questionsCorrect: number };
+/** 20개 종목 마스터 상수 (구현: 패킷 0002) */
+export type INSTRUMENTSFn = () => Instrument[];
 
-/** 종목의 지정 날짜 가격 조회, 0005·0011에서 호출 (구현: 패킷 0003) */
-export type getPriceForInstrumentFn = (instrumentId: string, dateStr: string) => number;
+/** KST 현재 날짜 (ISO 문자열) (구현: 패킷 0002) */
+export type getKSTDateFn = (date?: Date) => string;
 
-/** 현재 KST 시각 ISO 문자열, 모든 시간 처리 (구현: 패킷 0002) */
-export type getKSTDateFn = () => string;
+/** KST 날짜 더하기 (구현: 패킷 0002) */
+export type addDaysKSTFn = (date: string, days: number) => string;
 
-/** KST 문자열을 Date로 파싱 (구현: 패킷 0002) */
-export type parseKSTDateFn = (dateStr: string) => Date;
+/** 결정적 가격 생성 (hash32 기반) (구현: 패킷 0003) */
+export type generateDeterministicPriceFn = (code: string, date: string, basePrice: number, volatility: number) => number;
 
-/** KST 날짜에 days 더한 ISO 문자열 반환 (구현: 패킷 0002) */
-export type addDaysKSTFn = (dateStr: string, days: number) => string;
+/** localStorage 안전 읽기 (복구 포함) (구현: 패킷 0004) */
+export type storageGetFn = <T = unknown>(key: string) => T | null;
 
-/** localStorage 안전 조회 (파싱 복구, Quota 처리) (구현: 패킷 0004) */
-export type getStorageItemFn = <T>(key: string, defaultValue: T) => T;
+/** localStorage 안전 쓰기 (Quota 처리) (구현: 패킷 0004) */
+export type storageSetFn = (key: string, value: unknown) => boolean;
 
-/** localStorage 안전 저장 (QuotaExceededError 처리) (구현: 패킷 0004) */
-export type setStorageItemFn = (key: string, value: any) => boolean;
+/** localStorage 제거 (구현: 패킷 0004) */
+export type storageRemoveFn = (key: string) => void;
 
-/** 일일 체크인 실행, 스트릭·보상 계산 (구현: 패킷 0005) */
-export type executeCheckinFn = (userId: string, currentPortfolio: Portfolio) => { streakDays: number; dailyRewardKrw: number; isFirstCheckingToday: boolean };
+/** 거래 체결 엔진 (구현: 패킷 0005) */
+export type executeTradeForPortfolioFn = (portfolio: Portfolio, trade: Omit<Trade, 'id' | 'executedAt'>) => { success: boolean; updatedPortfolio?: Portfolio; error?: string };
 
-/** 거래 체결, Portfolio·Trade 생성 (구현: 패킷 0005) */
-export type executeTradeFn = (userId: string, walletBalance: number, trade: { instrumentId: string; quantity: number; type: "buy"|"sell"; pricePerUnit: number }) => { success: boolean; newWalletBalance: number; trade?: Trade; error?: string };
+/** 일일 지급 적용 (구현: 패킷 0005) */
+export type applyDailyStipendFn = (user: User, today: string) => { user: User; stipendKrw: number };
 
-/** 시계열 수익률로부터 백테스트 지표 계산 (구현: 패킷 0007) */
-export type calculateBacktestMetricsFn = (returns: number[]) => { cagr: number; maxDrawdown: number; sh
+/** 체크인 스트릭 갱신 (구현: 패킷 0005) */
+export type updateStreakFn = (user: User, today: string) => User;
+
+/** 전역 상태 훅 (AppStateContext) (구현: 패킷 0006) */
+export type useAppStateFn = () => { user: User; portfolio: Portfolio; setUser: (u: User) => void; setPortfolio: (p: Portfolio) => void; trades: Trade[] };
+
+/** 백테스트 종합 지표 계산 (구현: 패킷 0007) */
+export type calculateBacktestMetricsFn = (dailyReturns: number[], yearlyBreakdown: Record<string, number[]>) => BacktestResult;
+
+/** 연복합성장률 (구현: 패킷 0007) */
+export type calculateCAGRFn = (startValue: number, endValue: number, years: number) => number;
+
+/** 최대 낙폭 (구현: 패킷 0007) */
+export type calculateMDDFn = (prices: number[]) => nu
 ```
 
 ## Shared Types Contract (IMPORT these, do NOT redefine)
@@ -211,17 +223,21 @@ export interface LeaderboardEntry {
     SummaryHero.tsx
     TossPurchase.tsx
     TossRewardAd.tsx
+    TradeHistoryTab.tsx
   data/
     instruments.ts
   hooks/
   lib/
     backtest.ts
+    checkin.ts
     contract.ts
     date.ts
+    leaderboard.ts
     navigation.ts
     priceEngine.ts
     quiz.ts
     storage.ts
+    tradeEngine.ts
     types.ts
     utils.ts
   main.tsx
@@ -246,48 +262,23 @@ export interface LeaderboardEntry {
 
 ### Exports (src/lib/)
 - backtest.ts: export type BacktestCalcResult = BacktestResult |; export function runBacktest(preset: BacktestPreset): BacktestCalcResult
+- checkin.ts: export interface BootstrapAccount; export interface BootstrapMeta; export function bootstrap(storage: Map<string, any>):; export interface CheckinAccount; export interface CheckinStreak; export interface DailyCheckInResult; export function performDailyCheckin(account: CheckinAccount, streak: CheckinStreak): DailyCheckInResult; export function executeCheckin( _userId: string, _currentPortfolio: Portfolio ):
 - contract.ts: export type Instrument =; export type Position =; export type Portfolio =; export type Trade =; export type AppState =; export type RouteState =; export type QuizResult =; export type LeaderboardEntry =
-- date.ts: export function todayKst(): string; export function toDayIndex(dateStr: string): number; export function addYears(dateStr: string, years: number): string; export function endOfMonth(dateStr: string): string; export function getKSTDate(): string; export function parseKSTDate(dateStr: string): Date; export function addDaysKST(dateStr: string, days: number): string
+- date.ts: export function todayKst(): string; export function toDayIndex(dateStr: string): number; export function addYears(dateStr: string, years: number): string; export function endOfMonth(dateStr: string): string; export function getKSTDate(): string; export function formatKstDateTime(date: Date): string; export function parseKSTDate(dateStr: string): Date; export function addDaysKST(dateStr: string, days: number): string
+- leaderboard.ts: export interface LeaderboardEntry; export function getLeaderboardSeed(): LeaderboardEntry[]; export function clearLeaderboardSeedCache(): void; export function generateLeaderboardSeeds(): QuizLeaderboardEntry[]; export function buildLeaderboard( myTotalAsset: number, myReturnPct: number, myStreak: number ): LeaderboardEntry[]
 - navigation.ts: export const MAIN_TAB_PATHS = ["/", "/market", "/portfolio", "/leaderboard"] as const; export type MainTabPath = (typeof MAIN_TAB_PATHS)[number]; export const MAIN_TAB_ITEMS: TabItem[] = [; export function isMainTabPath(pathname: string): boolean
-- priceEngine.ts: export function getClose(symbol: string, dateStr: string): number; export const getPriceForInstrument: (instrumentId: string, dateStr: string) => number = getClose; export function getDailySeries(symbol: string): PricePoint[]; export function getMonthlySeries(symbol: string): PricePoint[]
-- quiz.ts: export function riskProfileOf(score: number): RiskType; export const RISK_LABEL: Record<RiskType, string> =; export const RISK_DESCRIPTION: Record<RiskType, string> =; export const RECOMMENDED_SYMBOLS: Record<RiskType, string[]> =
+- priceEngine.ts: export function hash32(str: string): number; export function mulberry32(seed: number): () => number; export function getClose(symbol: string, dateStr: string): number; export const getPriceForInstrument: (instrumentId: string, dateStr: string) => number = getClose; export function getDailySeries(symbol: string): PricePoint[]; export function getMonthlySeries(symbol: string): PricePoint[]
+- quiz.ts: export type RiskType = "STABLE" | "STABLE_GROWTH" | "NEUTRAL" | "ACTIVE" | "AGGRESSIVE"; export type QuizAnswer = number; export interface QuizChoice; export interface QuizQuestion; export const QUIZ_QUESTIONS: QuizQuestion[] = QUESTION_TEXTS.map((q, idx) => (; export function scoreQuiz(answers: QuizAnswer[]):; export const gradeQuiz: gradeQuizFn = (answersJson) =>; export const RISK_LABEL: Record<RiskType, string> =
 - storage.ts: export const STORAGE_KEYS =; export function loadAccount(): Account; export function saveAccount(account: Account, onQuotaExceeded?: QuotaExceededHandler): void; export function loadPositions(): PositionMap; export function savePositions(positions: PositionMap, onQuotaExceeded?: QuotaExceededHandler): void; export function loadTrades(): Trade[]; export function saveTrades(trades: Trade[], onQuotaExceeded?: QuotaExceededHandler): void; export function loadStreak(): StreakState
+- tradeEngine.ts: export type TradeType = "BUY" | "SELL"; export interface TradeRequest; export interface TradePosition; export interface TradeRecord; export interface TradeAccount; export interface TradeResult; export function executeTrade( account: TradeAccount, positions: Map<string, TradePosition>, request: TradeRequest, trade
 - types.ts: export type InstrumentType = "STOCK" | "ETF"; export interface Instrument; export interface PricePoint; export interface Account; export interface Position; export type PositionMap = Record<string, Position>; export type TradeSide = "BUY" | "SELL"; export interface Trade
-- utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string; export function formatPercent(decimal: number, decimals = 2): string; export function formatDate(dateStr: string): string
-
-### Components (src/components/)
-- AdSection.tsx: AdSection
-- AdSlot.tsx: AdSlot
-- Amount.tsx: Amount
-- BottomCTA.tsx: SubmitFooter, ButtonStack
-- Card.tsx: Card
-- CountUp.tsx: CountUp
-- DisclaimerNotice.tsx: DisclaimerNotice
-- FloatingTabBar.tsx: FloatingTabBar
-- LoadingSkeletons.tsx: HeroSkeleton, ListSkeleton
-- MiniBar.tsx: MiniBar
-- PageShell.tsx: PageShell
-- ScreenScaffold.tsx: ScreenScaffold
-- Sparkline.tsx: Sparkline
-- StateView.tsx: EmptyState, LoadingState
-- SummaryHero.tsx: SummaryHero
-- TossPurchase.tsx: TossPurchase
-- TossRewardAd.tsx: TossRewardAd
-
-### Module Dependencies (import graph)
-  lib/backtest.ts → imports: lib/types, lib/priceEngine, lib/date
-  lib/navigation.ts → imports: components/FloatingTabBar
-  lib/priceEngine.ts → imports: lib/types, data/instruments, lib/date
-  lib/quiz.ts → imports: lib/types
-  lib/storage.ts → imports: lib/types
+- utils.ts: export function cn(...classes: (string | boolean | undefined | null)[]): string; export function formatNumber(n: number): string; export function formatCurrency(n: number, currency = 'KRW'): string; export fu...
 CRITICAL: Before creating any new function, type, or component, check the list above. If something similar exists, import and use it.
 
 ## Already Implemented (do NOT duplicate or overwrite)
 - 0001: 엔티티 타입 + RouteState 계약 정의 (files: src/lib/types.ts)
 - 0002: 종목 마스터 20종목 + KST 날짜 유틸 (files: src/data/instruments.ts, src/lib/date.ts)
 - 0003: 결정적 가격 엔진 (hash32·mulberry32·Box–Muller) (files: src/lib/priceEngine.ts)
-- 0019: 라우팅 배선 + 전역 Provider + 탭바 노출 제어 (files: src/App.tsx)
-- 0020: 광고 배치·로딩 스켈레톤·고지 컴포넌트 폴리시 (files: src/components/DisclaimerNotice.tsx, src/components/AdSection.tsx, src/components/LoadingSkeletons.tsx)
 - 0005: 부트스트랩·일일지급·스트릭 + 거래 체결 엔진 (files: src/lib/checkin.ts, src/lib/tradeEngine.ts)
 - 0008: 퀴즈 채점 규칙 + 리더보드 시드 생성 (files: src/lib/quiz.ts, src/lib/leaderboard.ts)
 - 0009: 홈 화면 (S1) — 히어로·스트릭·메뉴 카드·고지 (files: src/pages/Home.tsx)
@@ -296,90 +287,5 @@ CRITICAL: Before creating any new function, type, or component, check the list a
 - 0012: 포트폴리오 (S4) — 보유종목 탭 (files: src/pages/Portfolio.tsx)
 - 0013: 포트폴리오 거래내역 탭 + 대량 리스트 처리 (files: src/components/TradeHistoryTab.tsx, src/pages/Portfolio.tsx)
 - 0014: 백테스트 구성 화면 (S5) — 종목/비중·실행·프리셋 (files: src/pages/Backtest.tsx)
-
-## TDD 상태
-⚠️ TDD 테스트 파일 자동 작성에 실패했습니다. 소스 코드를 작성하기 전에 `src/__tests__/packet-XXXX.test.ts` 파일에 AC 기반 테스트를 먼저 작성하세요 (TDD red phase). 테스트 작성 후 구현하세요.
-
-## Available exports from existing files
-// src/App.tsx
-export { MAIN_TAB_PATHS, MAIN_TAB_ITEMS, isMainTabPath } from '@/lib/navigation';
-export function useRoute(): { current: RouteState; navigate: (screen: string, preview?: any) => void } {
-export default function App() {
-
-// src/components/AdSection.tsx
-export function AdSection() {
-
-// src/components/AdSlot.tsx
-export function AdSlot({ adGroupId, className, variant, theme }: AdSlotProps) {
-
-// src/components/Amount.tsx
-export function Amount({
-
-// src/components/BottomCTA.tsx
-export function SubmitFooter({
-export function ButtonStack({
-
-// src/components/Card.tsx
-export function Card({
-
-// src/components/CountUp.tsx
-export function CountUp({
-
-// src/components/DisclaimerNotice.tsx
-export function DisclaimerNotice() {
-
-// src/components/FloatingTabBar.tsx
-export type TabItem = {
-export function FloatingTabBar({ items }: { items: TabItem[] }) {
-
-// src/components/LoadingSkeletons.tsx
-export function HeroSkeleton() {
-export function ListSkeleton({ rows, count = 5 }: { rows?: number; count?: number }) {
-
-// src/components/MiniBar.tsx
-export function MiniBar({
-
-// src/components/PageShell.tsx
-export function PageShell({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-
-// src/components/ScreenScaffold.tsx
-export function ScreenScaffold({
-
-// src/components/Sparkline.tsx
-export function Sparkline({
-
-// src/components/StateView.tsx
-export function EmptyState({
-export function LoadingState({
-
-// src/components/SummaryHero.tsx
-export function SummaryHero({
-
-// src/components/TossPurchase.tsx
-export interface TossPurchaseResult {
-export function TossPurchase({
-
-// src/components/TossRewardAd.tsx
-export function TossRewardAd({
-
-// src/components/TradeHistoryTab.tsx
-export function TradeHistoryTab({
-
-// src/data/instruments.ts
-export const INSTRUMENTS: Instrument[] = [
-export const INSTRUMENT_MAP: Record<string, Instrument> = Object.fromEntries(
-export function getInstrument(symbol: string): Instrument | undefined {
-
-// src/lib/backtest.ts
-expo
-
-## Memory Index (자동 학습 — 힌트로만 사용, 실제 코드 확인 필수)
-
-Available topics: deploy(1), general(9)
-
-Key lessons (verify against actual code before applying):
-- [general] 외부에서 들어온 모든 값(라우터 state, 로컬 저장소, 부분 입력 폼)은 사용 직전에 배열·객체 기본값으로 정규화하고, 테이블/맵 조회 결과는 존재 확인 후에만 하위 속성이나 length에 접근하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 의존 그래프 최하층의 타입·계약 파일은 런타임 코드 0줄의 순수 선언으로 가장 먼저 단독 타입체크를 통과시키고, 파일 생성은 셸 명령이 아닌 허용된 편집 도구로만 하게 강제하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 영속 저장소에서 읽은 값은 항상 스키마 기본값으로 정규화해 배열·객체 타입을 보장한 뒤 반환하고, 화면은 빈/손상/부분 데이터에서도 렌더되도록 방어하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 정책·기능 제거형 리팩터링은 화면과 도메인 로직 레이어에서만 수행하고, package.json의 플랫폼 필수 의존성(디자인 시스템·플랫폼 SDK·프레임워크 코어)은 어떤 경우에도 삭제하지 말 것 — 필수 패키지 화이트리스트를 빌드 전 가드로 검증하라. (60% · 타 앱 1회 — 맹신 금지)
-- [general] 공용 기반 모듈(상수·저장소·계산 유틸)이 실제로 머지되기 전에는 이를 import하는 화면·훅 패킷을 머지하지 말고, 모든 머지 게이트에 타입체크와 프로덕션 빌드 통과(미해결 import 0건)를 필수로 걸어라. (60% · 타 앱 1회 — 맹신 금지)
+- 0019: 라우팅 배선 + 전역 Provider + 탭바 노출 제어 (files: src/App.tsx)
+- 0020: 광고 배치·로딩 스켈레톤·고지 컴포넌트 폴리시 (files: src/components/DisclaimerNotice.tsx, src/components/AdSection.tsx, src/components/LoadingSkeletons.tsx)

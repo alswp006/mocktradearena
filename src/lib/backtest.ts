@@ -14,7 +14,16 @@
  * - 무위험수익률 연 3.0% 고정
  */
 
-import type { BacktestPreset, BacktestResult, YearlyReturn } from "@/lib/types";
+import type {
+  BacktestPreset,
+  BacktestResult,
+  YearlyReturn,
+  PresetItem,
+  BacktestYears,
+  BacktestResultData,
+  SeriesPoint,
+  YearlyReturnData,
+} from "@/lib/types";
 import { getClose } from "@/lib/priceEngine";
 import { todayKst, addYears, endOfMonth, getKSTDate } from "@/lib/date";
 
@@ -36,13 +45,43 @@ function addMonths(dateStr: string, months: number): string {
   return `${newY}-${String(newM).padStart(2, "0")}-01`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 함수 오버로딩: 두 가지 호출 방식 지원
+// 1. runBacktest(preset) → BacktestResult (legacy)
+// 2. runBacktest(items, years) → BacktestResultData (new)
+// ─────────────────────────────────────────────────────────────
+
+export function runBacktest(preset: BacktestPreset): BacktestCalcResult;
+export function runBacktest(
+  items: PresetItem[],
+  years: BacktestYears,
+): BacktestResultData;
+
 /**
- * 백테스트 계산 엔진
- * 프리셋을 입력받아 검증한 후, 유효하면 BacktestResult를 반환.
- * 검증 실패 시 {ok:false, reason}을 반환 (throw하지 않음).
- * 배당·거래비용·리밸런싱 미반영, 무위험수익률 연 3.0% 고정.
+ * 백테스트 계산 엔진 (오버로드 구현)
+ *
+ * Legacy: runBacktest(preset: BacktestPreset) → BacktestResult | {ok: false}
+ * New: runBacktest(items: PresetItem[], years: BacktestYears) → BacktestResultData
+ *
+ * 공통: 배당·거래비용·리밸런싱 미반영, 무위험수익률 연 3.0% 고정
  */
-export function runBacktest(preset: BacktestPreset): BacktestCalcResult {
+export function runBacktest(
+  presetOrItems: BacktestPreset | PresetItem[],
+  yearsArg?: BacktestYears,
+): BacktestCalcResult | BacktestResultData {
+  // New API: runBacktest(items, years)
+  if (Array.isArray(presetOrItems) && yearsArg !== undefined) {
+    return runBacktestNew(presetOrItems, yearsArg);
+  }
+
+  // Legacy API: runBacktest(preset)
+  return runBacktestLegacy(presetOrItems as BacktestPreset);
+}
+
+/**
+ * 레거시 구현: BacktestPreset → BacktestResult
+ */
+function runBacktestLegacy(preset: BacktestPreset): BacktestCalcResult {
   const items = preset.items ?? [];
   if (items.length < 1 || items.length > 5) {
     return {
@@ -154,5 +193,136 @@ export function runBacktest(preset: BacktestPreset): BacktestCalcResult {
     monthlyEquity: equity,
     yearly,
     computedAt: getKSTDate(),
+  };
+}
+
+/**
+ * 새로운 구현: PresetItem[] + BacktestYears → BacktestResultData
+ *
+ * 입력 검증 후 동일한 계산 로직으로 시계열+지표를 생성.
+ * 시계열 포인트 1개 이하인 극단 입력에서도 NaN/Infinity 없이 0값 지표 반환.
+ * 결정론: Date.now()/Math.random() 미사용, 동일 입력 → 동일 결과.
+ */
+function runBacktestNew(
+  items: PresetItem[],
+  years: BacktestYears,
+): BacktestResultData {
+  // 입력 검증
+  const validItems = items.length >= 1 && items.length <= 5;
+  const weightSum = items.reduce((sum, it) => sum + it.weight, 0);
+  const validWeight = weightSum === 100;
+
+  // 검증 실패하면 기본값 반환 (throw 안 함)
+  if (!validItems || !validWeight) {
+    return {
+      series: [],
+      totalReturn: 0,
+      cagr: 0,
+      mdd: 0,
+      sharpe: 0,
+      volatility: 0,
+      yearlyReturns: [],
+    };
+  }
+
+  const months = years * 12;
+  const endDateAnchor = todayKst();
+  const startDate = addYears(endDateAnchor, -years);
+
+  // 월말 평가일 목록: index 0은 매수일(startDate), 1..months는 순차 월말
+  const monthDates: string[] = [startDate];
+  for (let k = 1; k <= months; k++) {
+    monthDates.push(endOfMonth(addMonths(startDate, k)));
+  }
+
+  // 매수일 종가로 종목별 보유 수량 산정
+  const shares = items.map((item) => {
+    const price0 = getClose(item.symbol, startDate);
+    const alloc = Math.floor((INITIAL_AMOUNT * item.weight) / 100);
+    return price0 > 0 ? alloc / price0 : 0;
+  });
+
+  // 월별 평가금액 계산
+  const equity: number[] = [INITIAL_AMOUNT];
+  for (let k = 1; k <= months; k++) {
+    const date = monthDates[k];
+    let value = 0;
+    for (let i = 0; i < items.length; i++) {
+      value += shares[i] * getClose(items[i].symbol, date);
+    }
+    equity.push(Math.floor(value));
+  }
+
+  // 시계열: { date, value }[]
+  const series: SeriesPoint[] = monthDates.map((date, idx) => ({
+    date,
+    value: equity[idx],
+  }));
+
+  // 지표 계산
+  const finalAmount = equity[equity.length - 1];
+  const totalReturn = round2(
+    ((finalAmount - INITIAL_AMOUNT) / INITIAL_AMOUNT) * 100,
+  );
+  const cagr = round2(
+    (Math.pow(finalAmount / INITIAL_AMOUNT, 1 / years) - 1) * 100,
+  );
+
+  // MDD: 시계열 상 최고점 대비 최대 낙폭
+  let peak = equity[0];
+  let maxDrawdown = 0;
+  for (const value of equity) {
+    if (value > peak) peak = value;
+    const drawdown = peak > 0 ? (value - peak) / peak : 0;
+    if (drawdown < maxDrawdown) maxDrawdown = drawdown;
+  }
+  const mdd = round2(maxDrawdown * 100);
+
+  // 월간 수익률 → 연환산 변동성
+  let volatility = 0;
+  if (equity.length > 1) {
+    const monthlyReturns: number[] = [];
+    for (let k = 1; k < equity.length; k++) {
+      const prev = equity[k - 1];
+      monthlyReturns.push(prev > 0 ? equity[k] / prev - 1 : 0);
+    }
+    const meanReturn =
+      monthlyReturns.reduce((sum, r) => sum + r, 0) / monthlyReturns.length;
+    const variance =
+      monthlyReturns.reduce((sum, r) => sum + (r - meanReturn) ** 2, 0) /
+      monthlyReturns.length;
+    const monthlyStd = Math.sqrt(variance);
+    volatility = round2(monthlyStd * Math.sqrt(12) * 100);
+  }
+
+  // Sharpe ratio
+  const annualizedReturn = cagr / 100;
+  const annualizedVol = volatility / 100;
+  const sharpe =
+    annualizedVol === 0
+      ? 0
+      : round2((annualizedReturn - RISK_FREE_RATE) / annualizedVol);
+
+  // 연도별 수익률
+  const yearlyReturns: YearlyReturnData[] = [];
+  for (let y = 0; y < years; y++) {
+    const startIdx = y * 12;
+    const endIdx = (y + 1) * 12;
+    const startValue = equity[startIdx];
+    const endValue = equity[endIdx];
+    const ret = round2(
+      startValue > 0 ? (endValue / startValue - 1) * 100 : 0,
+    );
+    yearlyReturns.push({ year: y + 1, ret });
+  }
+
+  return {
+    series,
+    totalReturn,
+    cagr,
+    mdd,
+    sharpe,
+    volatility,
+    yearlyReturns,
   };
 }
