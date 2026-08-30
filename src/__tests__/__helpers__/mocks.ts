@@ -33,8 +33,15 @@ export function mockTds() {
       React.createElement("button", { onClick, disabled: disabled || loading || undefined, "data-loading": loading ? "true" : undefined, ...props }, children),
 
     ListRow: Object.assign(
-      ({ children, onClick, ...props }: any) =>
-        React.createElement("div", { onClick, role: "listitem", ...props }, children),
+      ({ children, onClick, contents, left, right, ...props }: any) =>
+        React.createElement(
+          "div",
+          { onClick, role: "listitem", ...props },
+          left,
+          contents,
+          right,
+          children,
+        ),
       {
         Text: ({ children }: any) => React.createElement("span", null, children),
         Texts: ({ top, bottom, type }: any) =>
@@ -80,7 +87,16 @@ export function mockTds() {
         : null,
 
     Tab: Object.assign(
-      ({ children }: any) => React.createElement("div", { role: "tablist" }, children),
+      ({ children, onChange }: any) =>
+        React.createElement(
+          "div",
+          { role: "tablist" },
+          React.Children.map(children, (child: any, index: number) =>
+            React.isValidElement(child)
+              ? React.cloneElement(child, { onClick: () => onChange?.(index) } as any)
+              : child,
+          ),
+        ),
       {
         Item: ({ children, selected, onClick }: any) =>
           React.createElement(
