@@ -168,10 +168,16 @@ export function mockTds() {
       { Header: ({ children }: any) => React.createElement("div", null, children) },
     ),
 
-    Chip: ({ children, selected, onClick }: any) =>
+    // Chip은 실제 TDS에서 여러 ChipItem을 감싸는 그룹 컨테이너다(개별 클릭 대상이 아님).
+    // kind/shape/size/variant/margin/wrap/withColorBackground는 non-DOM prop이라 걸러낸다.
+    Chip: ({ children, kind, shape, size, variant, margin, wrap, withColorBackground, ...props }: any) =>
+      React.createElement("div", { role: "group", ...props }, children),
+
+    // 실제 클릭 가능한 개별 칩 — ChipItemProps는 div 속성을 상속하므로 onClick/data-*/aria-*가 전달된다.
+    ChipItem: ({ children, selected, ...props }: any) =>
       React.createElement(
         "button",
-        { role: "button", "aria-pressed": selected, onClick },
+        { type: "button", "aria-pressed": !!selected, ...props },
         children,
       ),
 
